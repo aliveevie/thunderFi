@@ -1,0 +1,194 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User model
+model User {
+  id            String    @id @default(uuid())
+  walletAddress String    @unique
+  circleUserId  String?   @unique
+
+  sessions      Session[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Session model (Yellow SDK session)
+model Session {
+  id                  String        @id @default(uuid())
+  yellowSessionId     String?       @unique
+  userId              String
+  user                User          @relation(fields: [userId], references: [id])
+
+  // Allowance tracking
+  initialAllowance    Decimal       @db.Decimal(78, 0)
+  spentAmount         Decimal       @db.Decimal(78, 0) @default(0)
+
+  // Status
+  status              SessionStatus @default(PENDING)
+
+  // Transaction hashes
+  depositTxHash       String?
+  settlementTxHash    String?
+
+  // Relations
+  actions             Action[]
+  batches             SettlementBatch[]
+  payouts             Payout[]
+
+  // Timestamps
+  createdAt           DateTime      @default(now())
+  activatedAt         DateTime?
+  closedAt            DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum SessionStatus {
+  PENDING
+  ACTIVE
+  SETTLING
+  CLOSED
+}
+
+// Action model (off-chain actions)
+model Action {
+  id          String       @id @default(uuid())
+  sessionId   String
+  session     Session      @relation(fields: [sessionId], references: [id])
+
+  type        ActionType
+  payload     Json
+  signature   String?
+
+  fee         Decimal      @db.Decimal(78, 0) @default(0)
+
+  status      ActionStatus @default(PENDING)
+  receipt     Json?
+
+  // Settlement relation
+  batchId     String?
+  batch       SettlementBatch? @relation(fields: [batchId], references: [id])
+
+  // Timestamps
+  createdAt   DateTime     @default(now())
+  confirmedAt DateTime?
+  settledAt   DateTime?
+
+  @@index([sessionId])
+  @@index([status])
+  @@index([batchId])
+}
+
+enum ActionType {
+  PLACE_ORDER
+  CANCEL_ORDER
+  MODIFY_ORDER
+  MICRO_TIP
+}
+
+enum ActionStatus {
+  PENDING
+  CONFIRMED
+  SETTLED
+  FAILED
+}
+
+// Settlement batch model
+model SettlementBatch {
+  id            String      @id @default(uuid())
+  sessionId     String
+  session       Session     @relation(fields: [sessionId], references: [id])
+
+  // Batch data
+  batchHash     String?
+  salt          String?
+  actionCount   Int         @default(0)
+
+  // Settlement outcome
+  netAmount     Decimal     @db.Decimal(78, 0) @default(0)
+  gasCost       Decimal?    @db.Decimal(78, 0)
+
+  // Transaction hashes
+  commitTxHash  String?
+  revealTxHash  String?
+
+  // Status
+  status        BatchStatus @default(BUILDING)
+
+  // Relations
+  actions       Action[]
+
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  committedAt   DateTime?
+  revealedAt    DateTime?
+  settledAt     DateTime?
+
+  @@index([sessionId])
+  @@index([status])
+}
+
+enum BatchStatus {
+  BUILDING
+  COMMITTED
+  REVEALED
+  SETTLED
+  FAILED
+}
+
+// Payout model
+model Payout {
+  id                 String       @id @default(uuid())
+  sessionId          String
+  session            Session      @relation(fields: [sessionId], references: [id])
+
+  totalAmount        Decimal      @db.Decimal(78, 0)
+  sourceChain        String       @default("arc")
+
+  // Status
+  status             PayoutStatus @default(PENDING)
+  gatewayTransferId  String?
+
+  // Relations
+  recipients         PayoutRecipient[]
+
+  // Timestamps
+  createdAt          DateTime     @default(now())
+  completedAt        DateTime?
+
+  @@index([sessionId])
+  @@index([status])
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// Payout recipient
+model PayoutRecipient {
+  id        String   @id @default(uuid())
+  payoutId  String
+  payout    Payout   @relation(fields: [payoutId], references: [id])
+
+  address   String
+  chain     String
+  amount    Decimal  @db.Decimal(78, 0)
+
+  status    String   @default("pending")
+  txHash    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([payoutId])
+}

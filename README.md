@@ -106,11 +106,10 @@ See [architecture.md](./architecture.md) for detailed technical documentation.
 
 ## Roadmap
 
-See [roadmap-001.md](./roadmap-001.md) for development milestones.
 
 ## Team
 
-Built with ❤️ for ETHGlobal Hackathon
+Built with ❤️ for ibxLab
 
 ## License
 

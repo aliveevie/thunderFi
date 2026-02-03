@@ -12,7 +12,7 @@ interface ActionsState {
   clearActions: () => void;
 }
 
-export const useActionsStore = create<ActionsState>((set, get) => ({
+export const useActionsStore = create<ActionsState>((set) => ({
   actions: [],
   orders: [],
   isExecuting: false,

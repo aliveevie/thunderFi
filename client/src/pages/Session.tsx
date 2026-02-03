@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { Zap, XCircle, Clock, CheckCircle2 } from 'lucide-react';
+import { Zap, XCircle, CheckCircle2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from '@/components/ui';
 import { SessionStatus, CreateSessionModal, AllowanceDisplay } from '@/components/session';
 import { useSessionStore } from '@/stores/sessionStore';
-import { useWalletStore } from '@/stores/walletStore';
+import { useWallet } from '@/hooks/useWallet';
 import { formatAddress, formatDate } from '@/lib/utils';
 
 export function Session() {
   const [showCreateSession, setShowCreateSession] = useState(false);
   const { session, closeSession, isClosing } = useSessionStore();
-  const { isConnected, address } = useWalletStore();
+  const { isConnected, address } = useWallet();
 
   return (
     <div className="space-y-6">

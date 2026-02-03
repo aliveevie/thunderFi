@@ -14,7 +14,7 @@ interface SessionState {
   incrementActions: () => void;
 }
 
-export const useSessionStore = create<SessionState>((set, get) => ({
+export const useSessionStore = create<SessionState>((set) => ({
   session: null,
   stats: {
     totalActions: 0,

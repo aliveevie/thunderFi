@@ -12,7 +12,7 @@ interface SettlementState {
   revealBatch: (batchId: string) => Promise<void>;
 }
 
-export const useSettlementStore = create<SettlementState>((set, get) => ({
+export const useSettlementStore = create<SettlementState>((set) => ({
   batches: [],
   currentBatch: null,
   isSettling: false,

@@ -18,7 +18,11 @@
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.0",
     "lucide-react": "^0.312.0",
-    "framer-motion": "^11.0.3"
+    "framer-motion": "^11.0.3",
+    "@reown/appkit": "^1.6.8",
+    "@reown/appkit-adapter-wagmi": "^1.6.8",
+    "wagmi": "^2.14.11",
+    "viem": "^2.23.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.1",

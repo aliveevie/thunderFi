@@ -5,7 +5,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useActionsStore } from '@/stores/actionsStore';
 
 export function Settle() {
-  const { session, stats } = useSessionStore();
+  const { stats } = useSessionStore();
   const { actions } = useActionsStore();
 
   const unsettledActions = actions.filter((a) => a.status !== 'settled');

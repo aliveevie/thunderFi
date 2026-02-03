@@ -1,4 +1,4 @@
-import { Globe, ArrowRight, Zap } from 'lucide-react';
+import { Globe, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui';
 import { PayoutForm, PayoutHistory } from '@/components/payouts';
 

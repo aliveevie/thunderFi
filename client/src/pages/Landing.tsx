@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Zap, ArrowRight, Shield, Gauge, Globe, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui';
-import { useWalletStore } from '@/stores/walletStore';
+import { useWallet } from '@/hooks/useWallet';
 
 const features = [
   {
@@ -24,7 +24,7 @@ const features = [
 
 export function Landing() {
   const navigate = useNavigate();
-  const { connect, isConnected, isConnecting } = useWalletStore();
+  const { connect, isConnected, isConnecting } = useWallet();
 
   const handleGetStarted = async () => {
     if (!isConnected) {
@@ -130,7 +130,7 @@ export function Landing() {
             transition={{ delay: 0.4, duration: 0.6 }}
             className="grid md:grid-cols-3 gap-6 mt-24"
           >
-            {features.map((feature, index) => (
+            {features.map((feature) => (
               <div
                 key={feature.title}
                 className="p-6 rounded-2xl bg-dark-900/50 border border-dark-800 backdrop-blur-xl hover:border-thunder-500/30 transition-all duration-300"

@@ -1,11 +1,9 @@
-import { Zap, Wallet, ChevronDown } from 'lucide-react';
-import { Button } from '@/components/ui';
-import { useWalletStore } from '@/stores/walletStore';
+import { Zap } from 'lucide-react';
+import { ConnectButton } from '@/components/wallet';
 import { useSessionStore } from '@/stores/sessionStore';
-import { formatAddress, formatUSD } from '@/lib/utils';
+import { formatUSD } from '@/lib/utils';
 
 export function Header() {
-  const { address, isConnected, connect, disconnect } = useWalletStore();
   const { session } = useSessionStore();
 
   return (
@@ -34,24 +32,7 @@ export function Header() {
           )}
 
           {/* Wallet Connection */}
-          {isConnected ? (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                className="flex items-center gap-2"
-                onClick={disconnect}
-              >
-                <div className="w-2 h-2 rounded-full bg-green-500" />
-                <span>{formatAddress(address!)}</span>
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </div>
-          ) : (
-            <Button onClick={connect} className="flex items-center gap-2">
-              <Wallet className="w-4 h-4" />
-              Connect Wallet
-            </Button>
-          )}
+          <ConnectButton />
         </div>
       </div>
     </header>

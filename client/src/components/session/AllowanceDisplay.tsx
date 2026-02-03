@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { TrendingDown, TrendingUp } from 'lucide-react';
 import { useSessionStore } from '@/stores/sessionStore';
 import { formatUSD } from '@/lib/utils';
 

@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Zap, DollarSign, Info } from 'lucide-react';
+import { Zap, DollarSign, Info, Wifi, WifiOff } from 'lucide-react';
 import { Modal, Button, Input } from '@/components/ui';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useYellow } from '@/contexts';
+import { useYellowSession } from '@/hooks';
 
 interface CreateSessionModalProps {
   isOpen: boolean;
@@ -12,11 +14,40 @@ const presetAmounts = ['25', '50', '100', '250'];
 
 export function CreateSessionModal({ isOpen, onClose }: CreateSessionModalProps) {
   const [allowance, setAllowance] = useState('50');
-  const { createSession, isCreating } = useSessionStore();
+  const [useYellowNetwork, setUseYellowNetwork] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const { createSession: createDemoSession, isCreating: isDemoCreating } = useSessionStore();
+  const { setYellowSession } = useSessionStore();
+  const { isConnected: yellowConnected, isConnecting: yellowConnecting, connect: connectYellow } = useYellow();
+  const { createSession: createYellowSession, isCreating: isYellowCreating } = useYellowSession();
+
+  const isCreating = useYellowNetwork ? isYellowCreating : isDemoCreating;
 
   const handleCreate = async () => {
-    await createSession(allowance);
-    onClose();
+    setError(null);
+
+    try {
+      if (useYellowNetwork) {
+        // Connect to Yellow if not connected
+        if (!yellowConnected) {
+          await connectYellow();
+        }
+
+        // Create Yellow session
+        const session = await createYellowSession({ allowance });
+
+        // Sync to session store
+        setYellowSession(session.id, allowance);
+      } else {
+        // Demo mode
+        await createDemoSession(allowance);
+      }
+
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create session');
+    }
   };
 
   return (
@@ -28,17 +59,56 @@ export function CreateSessionModal({ isOpen, onClose }: CreateSessionModalProps)
       size="md"
     >
       <div className="space-y-6">
+        {/* Yellow Network Toggle */}
+        <div className="flex items-center justify-between p-4 rounded-lg bg-dark-800 border border-dark-700">
+          <div className="flex items-center gap-3">
+            {yellowConnected ? (
+              <Wifi className="w-5 h-5 text-green-500" />
+            ) : (
+              <WifiOff className="w-5 h-5 text-dark-500" />
+            )}
+            <div>
+              <p className="text-sm font-medium text-dark-100">Yellow Network</p>
+              <p className="text-xs text-dark-400">
+                {yellowConnected ? 'Connected - State channels active' : 'Off-chain state channels'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setUseYellowNetwork(!useYellowNetwork)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              useYellowNetwork ? 'bg-thunder-500' : 'bg-dark-600'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                useYellowNetwork ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
         {/* Info Banner */}
         <div className="flex items-start gap-3 p-4 rounded-lg bg-thunder-500/10 border border-thunder-500/20">
           <Info className="w-5 h-5 text-thunder-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="text-thunder-400 font-medium">How it works</p>
+            <p className="text-thunder-400 font-medium">
+              {useYellowNetwork ? 'Powered by Yellow SDK' : 'Demo Mode'}
+            </p>
             <p className="text-dark-400 mt-1">
-              Your allowance is the maximum you can spend in this session.
-              Actions are instant and gasless. Settle anytime to finalize on-chain.
+              {useYellowNetwork
+                ? 'Your funds are secured in a state channel. Trade instantly off-chain with cryptographic guarantees. Settle anytime to finalize on-chain.'
+                : 'Simulated trading session for testing. No real transactions.'}
             </p>
           </div>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
 
         {/* Amount Input */}
         <div>
@@ -87,6 +157,12 @@ export function CreateSessionModal({ isOpen, onClose }: CreateSessionModalProps)
             <span className="text-dark-400">Actions after deposit</span>
             <span className="text-green-400 font-medium">Unlimited & Free</span>
           </div>
+          {useYellowNetwork && (
+            <div className="flex justify-between text-sm">
+              <span className="text-dark-400">Settlement</span>
+              <span className="text-thunder-400 font-medium">Batch via Uniswap v4</span>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -96,11 +172,11 @@ export function CreateSessionModal({ isOpen, onClose }: CreateSessionModalProps)
           </Button>
           <Button
             onClick={handleCreate}
-            isLoading={isCreating}
+            isLoading={isCreating || yellowConnecting}
             className="flex-1 flex items-center justify-center gap-2"
           >
             <Zap className="w-4 h-4" />
-            Create Session
+            {yellowConnecting ? 'Connecting...' : 'Create Session'}
           </Button>
         </div>
       </div>

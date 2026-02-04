@@ -120,8 +120,6 @@ export interface SessionConfig {
   allocations: SessionAllocation[];
 }
 
-export type MessageSigner = (message: string) => Promise<string>;
-
 export interface YellowEventMap {
   connected: void;
   disconnected: void;

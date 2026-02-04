@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Zap, XCircle, CheckCircle2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from '@/components/ui';
 import { SessionStatus, CreateSessionModal, AllowanceDisplay } from '@/components/session';
@@ -7,6 +8,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { formatAddress, formatDate } from '@/lib/utils';
 
 export function Session() {
+  const navigate = useNavigate();
   const [showCreateSession, setShowCreateSession] = useState(false);
   const { session, closeSession, isClosing } = useSessionStore();
   const { isConnected, address } = useWallet();
@@ -81,7 +83,7 @@ export function Session() {
                       <span className="text-dark-400">Deposit Transaction</span>
                       {session.depositTxHash ? (
                         <a
-                          href={`https://etherscan.io/tx/${session.depositTxHash}`}
+                          href={`https://sepolia.basescan.org/tx/${session.depositTxHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-thunder-500 hover:underline font-mono text-sm"
@@ -127,7 +129,7 @@ export function Session() {
                   <Button
                     variant="secondary"
                     className="w-full justify-start"
-                    onClick={() => (window.location.href = '/trade')}
+                    onClick={() => navigate('/trade')}
                   >
                     <Zap className="w-4 h-4 mr-2" />
                     Trade
@@ -135,7 +137,7 @@ export function Session() {
                   <Button
                     variant="secondary"
                     className="w-full justify-start"
-                    onClick={() => (window.location.href = '/settle')}
+                    onClick={() => navigate('/settle')}
                   >
                     <CheckCircle2 className="w-4 h-4 mr-2" />
                     Settle Actions

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { Session, SessionStats } from '@/types';
 import { generateId } from '@/lib/utils';
 
@@ -26,7 +27,7 @@ interface SessionState {
   clearSession: () => void;
 }
 
-export const useSessionStore = create<SessionState>((set) => ({
+export const useSessionStore = create<SessionState>()(persist((set) => ({
   session: null,
   stats: {
     totalActions: 0,
@@ -186,4 +187,12 @@ export const useSessionStore = create<SessionState>((set) => ({
       },
     });
   },
+}), {
+  name: 'thunderfi-session',
+  partialize: (state) => ({
+    session: state.session,
+    stats: state.stats,
+    isYellowSession: state.isYellowSession,
+    yellowSessionId: state.yellowSessionId,
+  }),
 }));

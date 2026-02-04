@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Zap, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@/components/ui';
 import { SessionStatus, CreateSessionModal } from '@/components/session';
@@ -8,6 +9,7 @@ import { useWalletStore } from '@/stores/walletStore';
 import { formatUSD } from '@/lib/utils';
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const [showCreateSession, setShowCreateSession] = useState(false);
   const { session, stats } = useSessionStore();
   const { isConnected } = useWalletStore();
@@ -117,7 +119,7 @@ export function Dashboard() {
               <Button
                 variant="secondary"
                 className="h-auto py-4 flex-col"
-                onClick={() => (window.location.href = '/trade')}
+                onClick={() => (navigate('/trade'))}
               >
                 <ArrowUpRight className="w-6 h-6 mb-2 text-green-500" />
                 <span>Trade</span>
@@ -125,7 +127,7 @@ export function Dashboard() {
               <Button
                 variant="secondary"
                 className="h-auto py-4 flex-col"
-                onClick={() => (window.location.href = '/settle')}
+                onClick={() => (navigate('/settle'))}
               >
                 <Activity className="w-6 h-6 mb-2 text-thunder-500" />
                 <span>Settle</span>
@@ -133,7 +135,7 @@ export function Dashboard() {
               <Button
                 variant="secondary"
                 className="h-auto py-4 flex-col"
-                onClick={() => (window.location.href = '/payouts')}
+                onClick={() => (navigate('/payouts'))}
               >
                 <ArrowDownRight className="w-6 h-6 mb-2 text-blue-500" />
                 <span>Payout</span>
@@ -141,7 +143,7 @@ export function Dashboard() {
               <Button
                 variant="secondary"
                 className="h-auto py-4 flex-col"
-                onClick={() => (window.location.href = '/session')}
+                onClick={() => (navigate('/session'))}
               >
                 <Zap className="w-6 h-6 mb-2 text-dark-400" />
                 <span>Session</span>

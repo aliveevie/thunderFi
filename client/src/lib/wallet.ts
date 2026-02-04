@@ -1,6 +1,6 @@
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiProvider } from 'wagmi'
-import { sepolia, mainnet, arbitrum, base, polygon } from 'wagmi/chains'
+import { sepolia, baseSepolia, mainnet, arbitrum, base, polygon } from 'wagmi/chains'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { QueryClient } from '@tanstack/react-query'
 import type { AppKitNetwork } from '@reown/appkit/networks'
@@ -13,7 +13,8 @@ if (!projectId) {
 }
 
 // Define chains for thunderFi
-export const chains: [AppKitNetwork, ...AppKitNetwork[]] = [sepolia, mainnet, arbitrum, base, polygon]
+// baseSepolia is required for Yellow Network sandbox
+export const chains: [AppKitNetwork, ...AppKitNetwork[]] = [baseSepolia, sepolia, mainnet, arbitrum, base, polygon]
 
 // Create query client
 export const queryClient = new QueryClient()
@@ -40,7 +41,7 @@ createAppKit({
   adapters: [wagmiAdapter],
   projectId: projectId || '',
   networks: chains,
-  defaultNetwork: sepolia,
+  defaultNetwork: baseSepolia, // Required for Yellow Network sandbox
   metadata,
   features: {
     analytics: true,

@@ -6,3 +6,5 @@
 export * from './types';
 export * from './clearnode';
 export * from './service';
+export * from './wallet-signer';
+export * from './deposit';

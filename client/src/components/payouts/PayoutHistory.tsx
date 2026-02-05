@@ -40,7 +40,7 @@ export function PayoutHistory() {
         ) : (
           <div className="space-y-4">
             {payouts.map((payout) => {
-              const config = statusConfig[payout.status];
+              const config = statusConfig[payout.status] || statusConfig.pending;
               const StatusIcon = config.icon;
 
               return (

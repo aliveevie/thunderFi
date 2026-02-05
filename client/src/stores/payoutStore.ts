@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import type { Payout, PayoutRecipient } from '@/types';
 import * as api from '@/services/api';
+import { useSessionStore } from '@/stores/sessionStore';
+
+/** Check if an error indicates a stale/expired session */
+function isStaleSessionError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return msg.includes('not found') || msg.includes('401') || msg.includes('no token');
+}
 
 interface PayoutState {
   payouts: Payout[];
@@ -30,13 +38,13 @@ function apiPayoutToLocal(p: api.PayoutResponse): Payout {
     id: p.id,
     sessionId: p.sessionId,
     totalAmount: p.totalAmount,
-    status: p.status as Payout['status'],
+    status: p.status.toLowerCase() as Payout['status'],
     createdAt: new Date(p.createdAt),
     recipients: p.recipients.map(r => ({
       address: r.address,
       chain: r.chain,
       amount: r.amount,
-      status: r.status as PayoutRecipient['status'],
+      status: r.status.toLowerCase() as PayoutRecipient['status'],
       txHash: r.txHash ?? undefined,
     })),
   };
@@ -61,14 +69,23 @@ export const usePayoutStore = create<PayoutState>((set, get) => ({
       amount: r.amount,
     }));
 
-    const result = await api.createPayout(sessionId, apiRecipients);
-    const payout = apiPayoutToLocal(result);
+    try {
+      const result = await api.createPayout(sessionId, apiRecipients);
+      const payout = apiPayoutToLocal(result);
 
-    set((state) => ({
-      payouts: [payout, ...state.payouts],
-    }));
+      set((state) => ({
+        payouts: [payout, ...state.payouts],
+      }));
 
-    return payout;
+      return payout;
+    } catch (err) {
+      // If session is stale (server restarted), clear it so user creates a fresh one
+      if (isStaleSessionError(err)) {
+        useSessionStore.getState().clearSession();
+        set({ error: 'Session expired (server restarted). Please create a new session.' });
+      }
+      throw err;
+    }
   },
 
   processPayout: async (payoutId) => {

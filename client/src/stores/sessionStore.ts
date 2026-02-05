@@ -19,7 +19,7 @@ interface SessionState {
   incrementActions: () => void;
 
   // Yellow integration
-  setYellowSession: (sessionId: string, allowance: string, walletAddress?: string) => void;
+  setYellowSession: (sessionId: string, allowance: string, walletAddress?: string) => Promise<void>;
   syncYellowSession: (data: {
     remaining: string;
     actionsCount: number;
@@ -136,16 +136,20 @@ export const useSessionStore = create<SessionState>()(persist((set) => ({
   },
 
   // Set session from Yellow Network
-  setYellowSession: (sessionId: string, allowance: string, walletAddress?: string) => {
-    // Register with server to get JWT for payout/wallet APIs
+  setYellowSession: async (sessionId: string, allowance: string, walletAddress?: string) => {
+    // Register with server to get JWT + server session UUID for payout/wallet APIs
+    let serverSessionId = sessionId;
     if (walletAddress) {
-      api.createServerSession(walletAddress, allowance).catch((err) => {
-        console.warn('[Session] Server registration failed:', err);
-      });
+      try {
+        const serverSession = await api.createServerSession(walletAddress, allowance);
+        serverSessionId = serverSession.id;
+      } catch (err) {
+        console.warn('[Session] Server registration failed, using Yellow session ID:', err);
+      }
     }
 
     const session: Session = {
-      id: sessionId,
+      id: serverSessionId,
       status: 'active',
       allowance,
       spent: '0',

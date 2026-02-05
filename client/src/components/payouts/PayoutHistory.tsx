@@ -4,6 +4,16 @@ import { usePayoutStore } from '@/stores/payoutStore';
 import { formatDate, formatAddress, formatUSD } from '@/lib/utils';
 import type { PayoutStatus } from '@/types';
 
+// Chain-specific block explorer URLs (testnet)
+const EXPLORER_MAP: Record<string, string> = {
+  arc: 'https://testnet.arcscan.app/tx/',
+  arbitrum: 'https://sepolia.arbiscan.io/tx/',
+  base: 'https://sepolia.basescan.org/tx/',
+  optimism: 'https://sepolia-optimism.etherscan.io/tx/',
+  polygon: 'https://amoy.polygonscan.com/tx/',
+  ethereum: 'https://sepolia.etherscan.io/tx/',
+};
+
 const statusConfig: Record<PayoutStatus, { icon: typeof CheckCircle2; variant: string; label: string }> = {
   pending: { icon: Clock, variant: 'warning', label: 'Pending' },
   processing: { icon: Send, variant: 'info', label: 'Processing' },
@@ -80,6 +90,8 @@ export function PayoutHistory() {
                                 ? 'bg-green-500'
                                 : recipient.status === 'sent'
                                 ? 'bg-blue-500 animate-pulse'
+                                : recipient.status === 'failed'
+                                ? 'bg-red-500'
                                 : 'bg-dark-600'
                             }`}
                           />
@@ -96,7 +108,7 @@ export function PayoutHistory() {
                           </span>
                           {recipient.txHash && (
                             <a
-                              href={`https://etherscan.io/tx/${recipient.txHash}`}
+                              href={`${EXPLORER_MAP[recipient.chain] || 'https://sepolia.etherscan.io/tx/'}${recipient.txHash}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-dark-500 hover:text-thunder-500"

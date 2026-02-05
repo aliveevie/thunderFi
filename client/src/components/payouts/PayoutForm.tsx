@@ -11,6 +11,7 @@ interface Recipient {
 }
 
 const chains = [
+  { id: 'arc', name: 'Arc (Hub)' },
   { id: 'arbitrum', name: 'Arbitrum' },
   { id: 'base', name: 'Base' },
   { id: 'optimism', name: 'Optimism' },
@@ -22,7 +23,7 @@ export function PayoutForm() {
     { address: '', chain: 'arbitrum', amount: '' },
   ]);
 
-  const { createPayout, processPayout, isProcessing } = usePayoutStore();
+  const { createPayout, processPayout, isProcessing, error } = usePayoutStore();
   const { session } = useSessionStore();
 
   const addRecipient = () => {
@@ -49,13 +50,16 @@ export function PayoutForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid) return;
+    if (!isValid || !session) return;
 
-    const payout = await createPayout(recipients);
-    await processPayout(payout.id);
-
-    // Reset form
-    setRecipients([{ address: '', chain: 'arbitrum', amount: '' }]);
+    try {
+      const payout = await createPayout(session.id, recipients);
+      await processPayout(payout.id);
+      // Reset form
+      setRecipients([{ address: '', chain: 'arbitrum', amount: '' }]);
+    } catch {
+      // Error is captured in store
+    }
   };
 
   return (
@@ -154,6 +158,13 @@ export function PayoutForm() {
               <span className="text-thunder-400">Via Arc Hub</span>
             </div>
           </div>
+
+          {/* Error */}
+          {error && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+              {error}
+            </div>
+          )}
 
           {/* Submit */}
           <Button

@@ -63,8 +63,9 @@ export function Payouts() {
       <Card>
         <CardContent className="py-6">
           <h3 className="font-medium text-dark-200 mb-4">Supported Chains</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
+              { name: 'Arc (Hub)', color: 'bg-thunder-500' },
               { name: 'Arbitrum', color: 'bg-blue-500' },
               { name: 'Base', color: 'bg-blue-600' },
               { name: 'Optimism', color: 'bg-red-500' },

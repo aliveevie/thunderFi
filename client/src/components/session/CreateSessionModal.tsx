@@ -96,7 +96,7 @@ export function CreateSessionModal({ isOpen, onClose }: CreateSessionModalProps)
         return;
       } else {
         // Demo mode
-        await createDemoSession(allowance);
+        await createDemoSession(allowance, address);
       }
 
       onClose();
@@ -126,7 +126,7 @@ export function CreateSessionModal({ isOpen, onClose }: CreateSessionModalProps)
 
       setStep('creating');
       const session = await createYellowSession({ allowance });
-      setYellowSession(session.id, allowance);
+      setYellowSession(session.id, allowance, address);
       onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create session';

@@ -4,8 +4,9 @@
  */
 
 // Circle SDK Blockchain identifiers (from @circle-fin/developer-controlled-wallets)
-// Arc is not yet in the SDK — we use EVM-TESTNET or handle Arc via ethers directly
+// Arc is the central liquidity hub — all payouts originate from Arc
 export const CHAIN_TO_CIRCLE_BLOCKCHAIN: Record<string, string> = {
+  'arc': 'ARC-TESTNET',
   'arbitrum': 'ARB-SEPOLIA',
   'base': 'BASE-SEPOLIA',
   'optimism': 'OP-SEPOLIA',
@@ -13,7 +14,10 @@ export const CHAIN_TO_CIRCLE_BLOCKCHAIN: Record<string, string> = {
   'ethereum': 'ETH-SEPOLIA',
 };
 
-// Arc testnet config (Circle doesn't have Arc in SDK yet, handled via ethers)
+// The hub chain — all liquidity is sourced from Arc
+export const HUB_CHAIN = 'arc' as const;
+
+// Arc testnet config
 export const ARC_TESTNET = {
   chainId: 5042002,
   name: 'Arc Testnet',
@@ -34,7 +38,7 @@ export const EXPLORER_MAP: Record<string, string> = {
 
 // Supported destination chains for payouts
 export const SUPPORTED_CHAINS = [
-  { id: 'arc', name: 'Arc (Hub)', circleBlockchain: null },
+  { id: 'arc', name: 'Arc (Hub)', circleBlockchain: 'ARC-TESTNET' },
   { id: 'arbitrum', name: 'Arbitrum', circleBlockchain: 'ARB-SEPOLIA' },
   { id: 'base', name: 'Base', circleBlockchain: 'BASE-SEPOLIA' },
   { id: 'optimism', name: 'Optimism', circleBlockchain: 'OP-SEPOLIA' },

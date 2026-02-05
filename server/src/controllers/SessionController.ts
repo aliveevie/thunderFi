@@ -42,6 +42,14 @@ export class SessionController {
           try {
             await circleService.createUserWallets(user.id, [HUB_CHAIN]);
             logger.info(`[Session] Auto-created Arc hub wallet for user ${user.id}`);
+
+            // Request testnet USDC so the hub wallet has funds for payouts
+            try {
+              await circleService.requestTestnetTokens(user.id, HUB_CHAIN);
+              logger.info(`[Session] Requested testnet USDC for Arc hub wallet`);
+            } catch (faucetErr) {
+              logger.warn(`[Session] Faucet request failed (wallet may need manual funding): ${faucetErr}`);
+            }
           } catch (err) {
             logger.warn(`[Session] Failed to auto-create Arc wallet: ${err}`);
           }

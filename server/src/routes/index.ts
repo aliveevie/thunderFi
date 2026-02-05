@@ -3,6 +3,7 @@ import sessionRoutes from './session.routes';
 import actionRoutes from './action.routes';
 import settlementRoutes from './settlement.routes';
 import payoutRoutes, { payoutStandaloneRouter } from './payout.routes';
+import walletRoutes from './wallet.routes';
 import { settlementController } from '../controllers/SettlementController';
 
 const router = Router();
@@ -22,6 +23,7 @@ router.use('/sessions/:sessionId/payouts', payoutRoutes);
 
 // Standalone routes
 router.use('/payouts', payoutStandaloneRouter);
+router.use('/wallets', walletRoutes);
 router.get('/batches/:batchId', settlementController.getBatch.bind(settlementController));
 
 export default router;

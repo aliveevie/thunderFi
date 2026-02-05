@@ -8,7 +8,6 @@ const envSchema = z.object({
   PORT: z.string().default('3001'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
-  DATABASE_URL: z.string(),
   REDIS_URL: z.string().optional(),
 
   JWT_SECRET: z.string(),
@@ -18,9 +17,10 @@ const envSchema = z.object({
   YELLOW_API_KEY: z.string().optional(),
 
   CIRCLE_API_KEY: z.string().optional(),
+  CIRCLE_ENTITY_SECRET: z.string().optional(),
   CIRCLE_WALLET_SET_ID: z.string().optional(),
 
-  ARC_RPC_URL: z.string().optional(),
+  ARC_RPC_URL: z.string().optional().default('https://rpc.testnet.arc.network'),
   OPERATOR_PRIVATE_KEY: z.string().optional(),
 
   THUNDER_PRIVACY_HOOK_ADDRESS: z.string().optional(),

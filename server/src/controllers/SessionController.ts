@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest, ApiResponse, SessionResponse } from '../types';
 import { sessionService } from '../services/session/SessionService';
-import { prisma } from '../config/database';
+import { store } from '../config/store';
 import { generateToken } from '../middleware/auth';
 
 export class SessionController {
@@ -18,14 +18,10 @@ export class SessionController {
       const { allowance, walletAddress } = req.body;
 
       // Get or create user
-      let user = await prisma.user.findUnique({
-        where: { walletAddress },
-      });
+      let user = store.findUserByWallet(walletAddress);
 
       if (!user) {
-        user = await prisma.user.create({
-          data: { walletAddress },
-        });
+        user = store.createUser({ walletAddress });
       }
 
       const session = await sessionService.createSession(

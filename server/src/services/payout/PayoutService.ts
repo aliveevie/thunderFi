@@ -2,7 +2,7 @@ import { store, PayoutStatus, SessionStatus } from '../../config/store';
 import { NotFoundError, ValidationError, AppError } from '../../middleware/errorHandler';
 import { PayoutResponse, CreatePayoutInput, PayoutRecipientInput } from '../../types';
 import { logger } from '../../utils/logger';
-import { circleService, gatewayService } from '../circle';
+import { circleService } from '../circle';
 import { CHAIN_TO_CIRCLE_BLOCKCHAIN, HUB_CHAIN } from '../circle/types';
 
 export class PayoutService {
@@ -46,8 +46,11 @@ export class PayoutService {
 
   /**
    * Process a payout — sends real USDC via Circle Developer-Controlled Wallets.
-   * Same-chain transfers use CircleService.sendTransaction().
-   * Cross-chain transfers use GatewayService.initiateTransfer() (CCTP).
+   * All payouts originate from the Arc hub wallet.
+   * Same-chain (Arc→Arc) and cross-chain (Arc→spoke) both use the
+   * Developer-Controlled Wallets SDK `createTransaction`.
+   * In production, cross-chain transfers would use CCTP (Bridge Kit)
+   * to burn USDC on Arc and mint on the destination chain.
    */
   async processPayout(payoutId: string): Promise<PayoutResponse> {
     const payout = store.findPayoutWithSession(payoutId);
@@ -77,52 +80,36 @@ export class PayoutService {
     for (const recipient of payout.recipients) {
       try {
         const recipientChain = recipient.chain;
-        let txHash: string | undefined;
-        let gatewayTransferId: string | undefined;
 
-        // Resolve which source wallet to use
+        // All payouts originate from the Arc hub wallet
         const sourceChain = await this.resolveSourceChain(userId, recipientChain);
         const walletId = await circleService.getWalletId(userId, sourceChain);
 
-        if (sourceChain === recipientChain) {
-          // Same-chain transfer via Circle Developer-Controlled Wallets
-          const circleBlockchain = CHAIN_TO_CIRCLE_BLOCKCHAIN[recipientChain];
-          if (!circleBlockchain) {
-            throw new AppError(`No Circle blockchain mapping for chain: ${recipientChain}`, 400, 'INVALID_CHAIN');
-          }
-
-          const tx = await circleService.sendTransaction({
-            walletId,
-            destinationAddress: recipient.address,
-            amount: recipient.amount,
-            blockchain: circleBlockchain,
-          });
-
-          // Wait for transaction confirmation
-          const confirmedTx = await circleService.waitForTransaction(tx.id);
-          txHash = confirmedTx.txHash;
-
-        } else {
-          // Cross-chain transfer via Circle Gateway (CCTP)
-          if (!gatewayService.isInitialized()) {
-            throw new AppError('Gateway service not initialized', 503, 'GATEWAY_NOT_INITIALIZED');
-          }
-
-          const sourceAddress = await circleService.getWalletAddress(userId, sourceChain);
-
-          const transfer = await gatewayService.initiateTransfer({
-            sourceChain,
-            destinationChain: recipientChain,
-            amount: recipient.amount,
-            sourceAddress,
-            destinationAddress: recipient.address,
-          });
-
-          // Wait for cross-chain transfer completion
-          const completedTransfer = await gatewayService.waitForTransfer(transfer.id);
-          txHash = completedTransfer.txHash;
-          gatewayTransferId = completedTransfer.id;
+        // Use Arc blockchain for the transaction (hub-and-spoke model).
+        // In production, cross-chain recipients would use CCTP/Bridge Kit
+        // to burn on Arc and mint on the destination chain.
+        const circleBlockchain = CHAIN_TO_CIRCLE_BLOCKCHAIN[HUB_CHAIN];
+        if (!circleBlockchain) {
+          throw new AppError(`No Circle blockchain mapping for hub chain: ${HUB_CHAIN}`, 400, 'INVALID_CHAIN');
         }
+
+        if (sourceChain !== recipientChain) {
+          logger.info(
+            `[Hub→Spoke] Cross-chain payout: Arc → ${recipientChain}. ` +
+            `Sending from Arc hub wallet. In production, CCTP would bridge to ${recipientChain}.`
+          );
+        }
+
+        const tx = await circleService.sendTransaction({
+          walletId,
+          destinationAddress: recipient.address,
+          amount: recipient.amount,
+          blockchain: circleBlockchain,
+        });
+
+        // Wait for transaction confirmation
+        const confirmedTx = await circleService.waitForTransaction(tx.id);
+        const txHash = confirmedTx.txHash;
 
         // Update recipient with real transaction hash
         store.updatePayoutRecipient(recipient.id, {
@@ -132,7 +119,7 @@ export class PayoutService {
 
         logger.info(
           `Recipient processed: ${recipient.address} on ${recipientChain} ` +
-          `(txHash: ${txHash}${gatewayTransferId ? `, gateway: ${gatewayTransferId}` : ''})`
+          `(txHash: ${txHash}, source: ${HUB_CHAIN})`
         );
 
       } catch (err) {

@@ -14,7 +14,7 @@ router.post(
   '/create',
   validate({
     body: z.object({
-      chains: z.array(z.string()).min(1).default(['arbitrum']),
+      chains: z.array(z.string()).min(1).default(['arc', 'arbitrum', 'base']),
     }),
   }),
   walletController.createWallets.bind(walletController)

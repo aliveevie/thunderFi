@@ -102,7 +102,7 @@ export const usePayoutStore = create<PayoutState>((set, get) => ({
     }
   },
 
-  createWallets: async (chains = ['arbitrum']) => {
+  createWallets: async (chains = ['arc', 'arbitrum', 'base']) => {
     set({ error: null });
 
     try {

@@ -1,12 +1,14 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest, ApiResponse, WalletBalanceResponse } from '../types';
 import { circleService, arcService } from '../services/circle';
+import { HUB_CHAIN } from '../services/circle/types';
 import type { CircleWalletInfo, CircleTokenBalance } from '../services/circle/types';
 
 export class WalletController {
   /**
    * POST /api/v1/wallets/create
    * Create Circle developer-controlled wallets for the authenticated user.
+   * Arc (hub) wallet is always included to ensure hub routing works.
    */
   async createWallets(
     req: AuthenticatedRequest,
@@ -15,7 +17,12 @@ export class WalletController {
   ): Promise<void> {
     try {
       const userId = req.user!.id;
-      const { chains } = req.body;
+      let { chains } = req.body;
+
+      // Always ensure Arc hub wallet is created
+      if (!chains.includes(HUB_CHAIN)) {
+        chains = [HUB_CHAIN, ...chains];
+      }
 
       const wallets = await circleService.createUserWallets(userId, chains);
 

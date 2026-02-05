@@ -3,7 +3,7 @@ import { NotFoundError, ValidationError, AppError } from '../../middleware/error
 import { PayoutResponse, CreatePayoutInput, PayoutRecipientInput } from '../../types';
 import { logger } from '../../utils/logger';
 import { circleService, gatewayService } from '../circle';
-import { CHAIN_TO_CIRCLE_BLOCKCHAIN } from '../circle/types';
+import { CHAIN_TO_CIRCLE_BLOCKCHAIN, HUB_CHAIN } from '../circle/types';
 
 export class PayoutService {
   /**
@@ -160,22 +160,21 @@ export class PayoutService {
   }
 
   /**
-   * Resolve which source chain wallet to use for a given destination.
+   * Resolve source chain — Arc is ALWAYS the liquidity hub.
+   * All payouts originate from the user's Arc wallet, then route
+   * via same-chain transfer (if dest=arc) or CCTP (if dest=other chain).
    */
-  private async resolveSourceChain(userId: string, destinationChain: string): Promise<string> {
-    const directWallet = store.findCircleWalletByUserChain(userId, destinationChain);
+  private async resolveSourceChain(userId: string, _destinationChain: string): Promise<string> {
+    const arcWallet = store.findCircleWalletByUserChain(userId, HUB_CHAIN);
 
-    if (directWallet) {
-      return destinationChain;
+    if (!arcWallet) {
+      throw new ValidationError(
+        'No Arc hub wallet found. Arc is the liquidity hub — create an Arc wallet first.'
+      );
     }
 
-    const anyWallet = store.findFirstCircleWallet(userId);
-
-    if (!anyWallet) {
-      throw new ValidationError('No Circle wallets found for user. Create wallets first.');
-    }
-
-    return anyWallet.chain;
+    // Always route through Arc as the hub
+    return HUB_CHAIN;
   }
 
   /**

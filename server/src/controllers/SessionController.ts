@@ -1,8 +1,11 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest, ApiResponse, SessionResponse } from '../types';
 import { sessionService } from '../services/session/SessionService';
+import { circleService } from '../services/circle';
+import { HUB_CHAIN } from '../services/circle/types';
 import { store } from '../config/store';
 import { generateToken } from '../middleware/auth';
+import { logger } from '../utils/logger';
 
 export class SessionController {
   /**
@@ -31,6 +34,19 @@ export class SessionController {
 
       // Generate token for subsequent requests
       const token = generateToken(user.id, walletAddress);
+
+      // Auto-create Arc hub wallet if Circle SDK is initialized and user doesn't have one
+      if (circleService.isInitialized()) {
+        const existingArcWallet = store.findCircleWalletByUserChain(user.id, HUB_CHAIN);
+        if (!existingArcWallet) {
+          try {
+            await circleService.createUserWallets(user.id, [HUB_CHAIN]);
+            logger.info(`[Session] Auto-created Arc hub wallet for user ${user.id}`);
+          } catch (err) {
+            logger.warn(`[Session] Failed to auto-create Arc wallet: ${err}`);
+          }
+        }
+      }
 
       res.status(201).json({
         success: true,

@@ -56,6 +56,7 @@ export type BatchStatus = 'building' | 'committed' | 'revealed' | 'settled' | 'f
 // Payout Types
 export interface Payout {
   id: string;
+  sessionId?: string;
   recipients: PayoutRecipient[];
   totalAmount: string;
   status: PayoutStatus;
@@ -66,7 +67,7 @@ export interface PayoutRecipient {
   address: string;
   chain: string;
   amount: string;
-  status: 'pending' | 'sent' | 'confirmed';
+  status: 'pending' | 'sent' | 'confirmed' | 'failed';
   txHash?: string;
 }
 

@@ -1,36 +1,68 @@
 import { create } from 'zustand';
 import type { Payout, PayoutRecipient } from '@/types';
-import { generateId } from '@/lib/utils';
+import * as api from '@/services/api';
 
 interface PayoutState {
   payouts: Payout[];
   isProcessing: boolean;
+  isLoading: boolean;
+  error: string | null;
 
-  createPayout: (recipients: Omit<PayoutRecipient, 'status' | 'txHash'>[]) => Promise<Payout>;
+  // Wallet state
+  wallets: api.WalletRecord[];
+  walletBalances: Record<string, api.CircleTokenBalance[]>;
+  isLoadingBalances: boolean;
+
+  createPayout: (sessionId: string, recipients: Omit<PayoutRecipient, 'status' | 'txHash'>[]) => Promise<Payout>;
   processPayout: (payoutId: string) => Promise<void>;
+  fetchPayouts: (sessionId: string) => Promise<void>;
+
+  // Wallet actions
+  createWallets: (chains?: string[]) => Promise<void>;
+  fetchWallets: () => Promise<void>;
+  fetchWalletBalances: () => Promise<void>;
+
+  clearError: () => void;
+}
+
+function apiPayoutToLocal(p: api.PayoutResponse): Payout {
+  return {
+    id: p.id,
+    sessionId: p.sessionId,
+    totalAmount: p.totalAmount,
+    status: p.status as Payout['status'],
+    createdAt: new Date(p.createdAt),
+    recipients: p.recipients.map(r => ({
+      address: r.address,
+      chain: r.chain,
+      amount: r.amount,
+      status: r.status as PayoutRecipient['status'],
+      txHash: r.txHash ?? undefined,
+    })),
+  };
 }
 
 export const usePayoutStore = create<PayoutState>((set, get) => ({
   payouts: [],
   isProcessing: false,
+  isLoading: false,
+  error: null,
 
-  createPayout: async (recipientData) => {
-    const recipients: PayoutRecipient[] = recipientData.map((r) => ({
-      ...r,
-      status: 'pending',
+  wallets: [],
+  walletBalances: {},
+  isLoadingBalances: false,
+
+  createPayout: async (sessionId, recipientData) => {
+    set({ error: null });
+
+    const apiRecipients: api.PayoutRecipientInput[] = recipientData.map(r => ({
+      address: r.address,
+      chain: r.chain,
+      amount: r.amount,
     }));
 
-    const totalAmount = recipients
-      .reduce((sum, r) => sum + parseFloat(r.amount), 0)
-      .toFixed(2);
-
-    const payout: Payout = {
-      id: generateId(),
-      recipients,
-      totalAmount,
-      status: 'pending',
-      createdAt: new Date(),
-    };
+    const result = await api.createPayout(sessionId, apiRecipients);
+    const payout = apiPayoutToLocal(result);
 
     set((state) => ({
       payouts: [payout, ...state.payouts],
@@ -40,43 +72,69 @@ export const usePayoutStore = create<PayoutState>((set, get) => ({
   },
 
   processPayout: async (payoutId) => {
-    set({ isProcessing: true });
+    set({ isProcessing: true, error: null });
 
-    // Simulate processing each recipient
-    const payout = get().payouts.find((p) => p.id === payoutId);
-    if (!payout) return;
-
-    // Update status to processing
-    set((state) => ({
-      payouts: state.payouts.map((p) =>
-        p.id === payoutId ? { ...p, status: 'processing' } : p
-      ),
-    }));
-
-    // Process each recipient with a delay
-    for (let i = 0; i < payout.recipients.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const result = await api.processPayout(payoutId);
+      const updated = apiPayoutToLocal(result);
 
       set((state) => ({
-        payouts: state.payouts.map((p) => {
-          if (p.id !== payoutId) return p;
-          const newRecipients = [...p.recipients];
-          newRecipients[i] = {
-            ...newRecipients[i],
-            status: 'confirmed',
-            txHash: '0x' + generateId() + generateId(),
-          };
-          return { ...p, recipients: newRecipients };
-        }),
+        payouts: state.payouts.map(p => p.id === payoutId ? updated : p),
+        isProcessing: false,
       }));
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to process payout';
+      set({ isProcessing: false, error: errorMsg });
     }
-
-    // Mark as completed
-    set((state) => ({
-      payouts: state.payouts.map((p) =>
-        p.id === payoutId ? { ...p, status: 'completed' } : p
-      ),
-      isProcessing: false,
-    }));
   },
+
+  fetchPayouts: async (sessionId) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const results = await api.getPayouts(sessionId);
+      const payouts = results.map(apiPayoutToLocal);
+
+      set({ payouts, isLoading: false });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch payouts';
+      set({ isLoading: false, error: errorMsg });
+    }
+  },
+
+  createWallets: async (chains = ['arbitrum']) => {
+    set({ error: null });
+
+    try {
+      await api.createWallets(chains);
+      await get().fetchWallets();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to create wallets';
+      set({ error: errorMsg });
+    }
+  },
+
+  fetchWallets: async () => {
+    try {
+      const wallets = await api.getWallets();
+      set({ wallets });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch wallets';
+      set({ error: errorMsg });
+    }
+  },
+
+  fetchWalletBalances: async () => {
+    set({ isLoadingBalances: true });
+
+    try {
+      const balances = await api.getAllBalances();
+      set({ walletBalances: balances, isLoadingBalances: false });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch balances';
+      set({ isLoadingBalances: false, error: errorMsg });
+    }
+  },
+
+  clearError: () => set({ error: null }),
 }));

@@ -14,9 +14,28 @@ model User {
   circleUserId  String?   @unique
 
   sessions      Session[]
+  circleWallets CircleWallet[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+// Circle Developer-Controlled Wallet
+model CircleWallet {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+
+  circleWalletId  String   @unique
+  walletSetId     String
+  chain           String
+  address         String
+
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, chain])
+  @@index([userId])
+  @@index([circleWalletId])
 }
 
 // Session model (Yellow SDK session)

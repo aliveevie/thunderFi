@@ -17,12 +17,12 @@ export class SessionService {
       throw new ValidationError('Allowance must be greater than 0');
     }
 
-    // Create session
+    // Create session — auto-activate for MVP (no deposit gate)
     const session = store.createSession({
       userId,
       initialAllowance: input.allowance,
       spentAmount: '0',
-      status: SessionStatus.PENDING,
+      status: SessionStatus.ACTIVE,
       yellowSessionId: null,
       depositTxHash: null,
       settlementTxHash: null,

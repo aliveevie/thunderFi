@@ -1,15 +1,21 @@
 import { createServer } from 'http';
 import { createApp } from './app';
 import { env } from './config/env';
-import { connectDatabase, disconnectDatabase } from './config/database';
 import { initializeWebSocket } from './websocket';
 import { logger } from './utils/logger';
 import { privacyAuctionService } from './services/privacy';
+import { circleService, arcService, gatewayService } from './services/circle';
 
 async function main() {
   try {
-    // Connect to database
-    await connectDatabase();
+    // Initialize Circle Developer-Controlled Wallets SDK
+    await circleService.initialize();
+
+    // Initialize Arc blockchain provider
+    arcService.initialize();
+
+    // Initialize Circle Gateway (CCTP)
+    gatewayService.initialize();
 
     // Initialize Privacy Auction Service (connects to Sepolia)
     await privacyAuctionService.initialize();
@@ -31,6 +37,7 @@ async function main() {
   🌐 HTTP:      http://localhost:${env.PORT}
   🔌 WebSocket: ws://localhost:${env.PORT}
   📚 API:       http://localhost:${env.PORT}/api/v1
+  💾 Storage:   In-memory (MVP mode)
 
   Environment: ${env.NODE_ENV}
       `);
@@ -40,8 +47,7 @@ async function main() {
     const shutdown = async (signal: string) => {
       logger.info(`${signal} received, shutting down gracefully...`);
 
-      httpServer.close(async () => {
-        await disconnectDatabase();
+      httpServer.close(() => {
         logger.info('Server closed');
         process.exit(0);
       });

@@ -278,7 +278,7 @@ export class CircleService {
       throw new ValidationError(`Chain ${chain} not supported for faucet`);
     }
 
-    // Arc doesn't support native token faucet requests
+    // Arc's native currency is USDC, so skip native token request for Arc
     const requestNative = chain !== 'arc';
 
     await client.requestTestnetTokens({

@@ -50,6 +50,9 @@ out/
 broadcast/
 artifacts/
 
+# Circle recovery files (sensitive)
+recovery_file*.dat
+
 # Misc
 *.local
 .turbo

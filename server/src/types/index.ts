@@ -129,6 +129,24 @@ export interface PayoutRecipientResponse {
   txHash: string | null;
 }
 
+// Wallet types
+export interface WalletInfo {
+  id: string;
+  circleWalletId: string;
+  chain: string;
+  address: string;
+  createdAt: Date;
+}
+
+export interface WalletBalanceResponse {
+  chain: string;
+  balances: {
+    token: string;
+    symbol: string;
+    amount: string;
+  }[];
+}
+
 // WebSocket event types
 export interface WSEvents {
   'session:updated': SessionResponse;

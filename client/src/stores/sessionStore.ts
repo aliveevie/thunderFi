@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Session, SessionStats } from '@/types';
 import { generateId } from '@/lib/utils';
+import * as api from '@/services/api';
 
 interface SessionState {
   session: Session | null;
@@ -12,13 +13,13 @@ interface SessionState {
   yellowSessionId: string | null;
 
   // Core actions
-  createSession: (allowance: string) => Promise<void>;
+  createSession: (allowance: string, walletAddress?: string) => Promise<void>;
   closeSession: () => Promise<void>;
   updateSpent: (amount: string) => void;
   incrementActions: () => void;
 
   // Yellow integration
-  setYellowSession: (sessionId: string, allowance: string) => void;
+  setYellowSession: (sessionId: string, allowance: string, walletAddress?: string) => Promise<void>;
   syncYellowSession: (data: {
     remaining: string;
     actionsCount: number;
@@ -40,35 +41,47 @@ export const useSessionStore = create<SessionState>()(persist((set) => ({
   isYellowSession: false,
   yellowSessionId: null,
 
-  createSession: async (allowance: string) => {
+  createSession: async (allowance: string, walletAddress?: string) => {
     set({ isCreating: true });
 
-    // In demo mode, simulate session creation
-    // In production, this is called after Yellow session is created
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      let sessionId = generateId();
 
-    const session: Session = {
-      id: generateId(),
-      status: 'active',
-      allowance,
-      spent: '0',
-      remaining: allowance,
-      actionsCount: 0,
-      depositTxHash: '0x' + generateId() + generateId(),
-      createdAt: new Date(),
-    };
+      // Register with server to get JWT (needed for payout/wallet APIs)
+      if (walletAddress) {
+        try {
+          const serverSession = await api.createServerSession(walletAddress, allowance);
+          sessionId = serverSession.id;
+        } catch (err) {
+          console.warn('[Session] Server registration failed, using local session:', err);
+        }
+      }
 
-    set({
-      session,
-      isCreating: false,
-      isYellowSession: false,
-      stats: {
-        totalActions: 0,
-        gasSaved: '0',
-        totalFeesPaid: '0',
-        netPnL: '0',
-      },
-    });
+      const session: Session = {
+        id: sessionId,
+        status: 'active',
+        allowance,
+        spent: '0',
+        remaining: allowance,
+        actionsCount: 0,
+        depositTxHash: '0x' + generateId() + generateId(),
+        createdAt: new Date(),
+      };
+
+      set({
+        session,
+        isCreating: false,
+        isYellowSession: false,
+        stats: {
+          totalActions: 0,
+          gasSaved: '0',
+          totalFeesPaid: '0',
+          netPnL: '0',
+        },
+      });
+    } catch {
+      set({ isCreating: false });
+    }
   },
 
   closeSession: async () => {
@@ -123,9 +136,20 @@ export const useSessionStore = create<SessionState>()(persist((set) => ({
   },
 
   // Set session from Yellow Network
-  setYellowSession: (sessionId: string, allowance: string) => {
+  setYellowSession: async (sessionId: string, allowance: string, walletAddress?: string) => {
+    // Register with server to get JWT + server session UUID for payout/wallet APIs
+    let serverSessionId = sessionId;
+    if (walletAddress) {
+      try {
+        const serverSession = await api.createServerSession(walletAddress, allowance);
+        serverSessionId = serverSession.id;
+      } catch (err) {
+        console.warn('[Session] Server registration failed, using Yellow session ID:', err);
+      }
+    }
+
     const session: Session = {
-      id: sessionId,
+      id: serverSessionId,
       status: 'active',
       allowance,
       spent: '0',
@@ -175,6 +199,7 @@ export const useSessionStore = create<SessionState>()(persist((set) => ({
   },
 
   clearSession: () => {
+    api.setAuthToken(null);
     set({
       session: null,
       isYellowSession: false,

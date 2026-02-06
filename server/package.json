@@ -5,16 +5,13 @@
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "start": "node dist/index.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.9.0",
+    "@circle-fin/developer-controlled-wallets": "^10.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
+    "ethers": "^6.10.0",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
@@ -22,9 +19,8 @@
     "redis": "^4.6.12",
     "socket.io": "^4.7.4",
     "uuid": "^9.0.1",
-    "zod": "^3.22.4",
-    "ethers": "^6.10.0",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -33,8 +29,8 @@
     "@types/node": "^20.11.5",
     "@types/uuid": "^9.0.7",
     "nodemon": "^3.0.3",
-    "prisma": "^5.9.0",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.3"
   }
 }

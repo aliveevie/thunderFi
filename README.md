@@ -97,9 +97,9 @@ Custom hook implementing commit-reveal batch auctions for MEV protection.
 **Contracts Deployed (Sepolia):**
 | Contract | Address |
 |----------|---------|
-| ThunderBatchAuction | `0x3F2C0a59A4721f949EB689D0b32A42f0B0f35794` |
-| ThunderPrivacyHook | `0x0f9E2883cd11D10DE50d48c4E77379ae9b4e7D88` |
-| PrivacyRouter | `0xEC4ea50D14d470dCc6D64F9d99f9C0C06DeFf82F` |
+| ThunderBatchAuction | [`0x3F2C0a59A4721f949EB689D0b32A42f0B0f35794`](https://sepolia.etherscan.io/address/0x3F2C0a59A4721f949EB689D0b32A42f0B0f35794) |
+| ThunderPrivacyHook | [`0x0f9E2883cd11D10DE50d48c4E77379ae9b4e7D88`](https://sepolia.etherscan.io/address/0x0f9E2883cd11D10DE50d48c4E77379ae9b4e7D88) |
+| PrivacyRouter | [`0xEC4ea50D14d470dCc6D64F9d99f9C0C06DeFf82F`](https://sepolia.etherscan.io/address/0xEC4ea50D14d470dCc6D64F9d99f9C0C06DeFf82F) |
 
 **How it works:**
 1. Orders submitted as cryptographic commitments (hidden price/amount)

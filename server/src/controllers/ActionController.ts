@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest, ApiResponse, ActionResponse } from '../types';
 import { actionService } from '../services/session/ActionService';
-import { ActionStatus } from '@prisma/client';
+import { ActionStatus } from '../config/store';
 
 export class ActionController {
   /**

@@ -4,11 +4,15 @@ import { env } from './config/env';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { initializeWebSocket } from './websocket';
 import { logger } from './utils/logger';
+import { privacyAuctionService } from './services/privacy';
 
 async function main() {
   try {
     // Connect to database
     await connectDatabase();
+
+    // Initialize Privacy Auction Service (connects to Sepolia)
+    await privacyAuctionService.initialize();
 
     // Create Express app
     const app = createApp();

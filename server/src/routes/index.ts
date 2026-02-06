@@ -3,6 +3,7 @@ import sessionRoutes from './session.routes';
 import actionRoutes from './action.routes';
 import settlementRoutes from './settlement.routes';
 import payoutRoutes, { payoutStandaloneRouter } from './payout.routes';
+import privacyRoutes from './privacy.routes';
 import { settlementController } from '../controllers/SettlementController';
 
 const router = Router();
@@ -23,5 +24,8 @@ router.use('/sessions/:sessionId/payouts', payoutRoutes);
 // Standalone routes
 router.use('/payouts', payoutStandaloneRouter);
 router.get('/batches/:batchId', settlementController.getBatch.bind(settlementController));
+
+// Privacy auction routes (Uniswap v4 integration)
+router.use('/privacy', privacyRoutes);
 
 export default router;

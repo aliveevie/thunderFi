@@ -403,9 +403,24 @@ contract ThunderPrivacyHookTest is Test {
 
     function test_SettleBatch() public {
         uint256 batchId = hook.currentBatchId();
+        ThunderPrivacyHook.Batch memory initialBatch = hook.getBatch(batchId);
 
-        // Warp past reveal deadline (into settle period)
-        vm.warp(block.timestamp + COMMIT_PERIOD + REVEAL_PERIOD + 1);
+        // Commit 3 users (MIN_BATCH_SIZE requirement)
+        _commitUser(alice, batchId, 0);
+        _commitUser(bob, batchId, 0);
+        _commitUser(charlie, batchId, 0);
+
+        // Warp to reveal period (just past commit deadline)
+        vm.warp(initialBatch.commitDeadline + 1);
+
+        // Reveal all users
+        _revealUser(alice, batchId, 0);
+        _revealUser(bob, batchId, 0);
+        _revealUser(charlie, batchId, 0);
+
+        // Warp to settle period (past reveal deadline)
+        // Test contract is operator, so can settle immediately in settle period
+        vm.warp(initialBatch.revealDeadline + 1);
 
         hook.settleBatch(batchId);
 
@@ -419,8 +434,23 @@ contract ThunderPrivacyHookTest is Test {
 
     function test_SettleBatch_RevertsIfAlreadySettled() public {
         uint256 batchId = hook.currentBatchId();
+        ThunderPrivacyHook.Batch memory initialBatch = hook.getBatch(batchId);
 
-        vm.warp(block.timestamp + COMMIT_PERIOD + REVEAL_PERIOD + 1);
+        // Commit 3 users (MIN_BATCH_SIZE requirement)
+        _commitUser(alice, batchId, 0);
+        _commitUser(bob, batchId, 0);
+        _commitUser(charlie, batchId, 0);
+
+        // Warp to reveal period (just past commit deadline)
+        vm.warp(initialBatch.commitDeadline + 1);
+
+        // Reveal all users
+        _revealUser(alice, batchId, 0);
+        _revealUser(bob, batchId, 0);
+        _revealUser(charlie, batchId, 0);
+
+        // Warp to settle period (past reveal deadline)
+        vm.warp(initialBatch.revealDeadline + 1);
 
         hook.settleBatch(batchId);
 
@@ -574,11 +604,26 @@ contract ThunderPrivacyHookTest is Test {
 
     function test_EmitsBatchSettled() public {
         uint256 batchId = hook.currentBatchId();
+        ThunderPrivacyHook.Batch memory initialBatch = hook.getBatch(batchId);
 
-        vm.warp(block.timestamp + COMMIT_PERIOD + REVEAL_PERIOD + 1);
+        // Commit 3 users (MIN_BATCH_SIZE requirement)
+        _commitUser(alice, batchId, 0);
+        _commitUser(bob, batchId, 0);
+        _commitUser(charlie, batchId, 0);
+
+        // Warp to reveal period (just past commit deadline)
+        vm.warp(initialBatch.commitDeadline + 1);
+
+        // Reveal all users
+        _revealUser(alice, batchId, 0);
+        _revealUser(bob, batchId, 0);
+        _revealUser(charlie, batchId, 0);
+
+        // Warp to settle period (past reveal deadline)
+        vm.warp(initialBatch.revealDeadline + 1);
 
         vm.expectEmit(true, false, false, false);
-        emit ThunderPrivacyHook.BatchSettled(batchId, 0, 0, 0, bytes32(0));
+        emit ThunderPrivacyHook.BatchSettled(batchId, 3, 0, 0, bytes32(0));
 
         hook.settleBatch(batchId);
     }

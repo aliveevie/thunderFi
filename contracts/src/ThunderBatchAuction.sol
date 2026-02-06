@@ -350,13 +350,13 @@ contract ThunderBatchAuction is ReentrancyGuard {
         }
 
         // Calculate fill amount (may be partial if oversubscribed)
-        uint256 fillAmount = _calculateFillAmount(auction, order);
+        uint256 fillAmount = _calculateFillAmount(auctionId, auction, order);
 
         order.filled = true;
         order.filledAmount = fillAmount;
 
         // Execute the fill
-        _executeFill(auction, order, fillAmount);
+        _executeFill(auctionId, auction, order, fillAmount);
 
         emit OrderFilled(
             auctionId,
@@ -429,13 +429,17 @@ contract ThunderBatchAuction is ReentrancyGuard {
     }
 
     /// @notice Calculate fill amount for an order
+    /// @param auctionId The auction ID
+    /// @param auction The auction storage reference
+    /// @param order The order storage reference
     function _calculateFillAmount(
+        uint256 auctionId,
         Auction storage auction,
         Order storage order
     ) internal view returns (uint256) {
         // Get total eligible volume for this side
         uint256 totalEligible = _getEligibleVolume(
-            currentAuctionId, // Note: should pass auctionId
+            auctionId,
             order.isBid,
             auction.clearingPrice
         );
@@ -459,7 +463,12 @@ contract ThunderBatchAuction is ReentrancyGuard {
     }
 
     /// @notice Execute a fill
+    /// @param auctionId The auction ID (for event emission)
+    /// @param auction The auction storage reference
+    /// @param order The order storage reference
+    /// @param fillAmount Amount of token0 being filled
     function _executeFill(
+        uint256 auctionId,
         Auction storage auction,
         Order storage order,
         uint256 fillAmount
@@ -468,24 +477,35 @@ contract ThunderBatchAuction is ReentrancyGuard {
 
         if (order.isBid) {
             // Buyer: receive token0, pay token1
-            // Transfer token0 from contract to buyer
-            // (In production, token0 comes from matched sellers)
+            // Token0 comes from matched sellers who deposited it
 
-            // Refund excess token1 deposit
+            // Transfer token0 to buyer (the amount they purchased)
+            if (fillAmount > 0) {
+                IERC20(auction.token0).safeTransfer(order.trader, fillAmount);
+            }
+
+            // Refund excess token1 deposit (what they didn't spend)
             uint256 usedDeposit = quoteAmount;
             if (order.deposit > usedDeposit) {
                 IERC20(auction.token1).safeTransfer(order.trader, order.deposit - usedDeposit);
             }
         } else {
             // Seller: receive token1, give token0
-            // Transfer token1 to seller
-            IERC20(auction.token1).safeTransfer(order.trader, quoteAmount);
+            // Token1 comes from matched buyers who deposited it
 
-            // Refund excess token0 deposit
+            // Transfer token1 to seller (payment for their token0)
+            if (quoteAmount > 0) {
+                IERC20(auction.token1).safeTransfer(order.trader, quoteAmount);
+            }
+
+            // Refund excess token0 deposit (what they didn't sell)
             if (order.deposit > fillAmount) {
                 IERC20(auction.token0).safeTransfer(order.trader, order.deposit - fillAmount);
             }
         }
+
+        // Silence unused variable warning
+        auctionId;
     }
 
     // ============ View Functions ============

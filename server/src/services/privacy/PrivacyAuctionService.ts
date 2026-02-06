@@ -4,7 +4,11 @@
  * Connects to the deployed ThunderBatchAuction contract on Sepolia
  * to provide privacy-preserving batch auction functionality.
  *
- * Contract: 0x7020cEACF748d9163c39A097a7BF63ea02F8CE75
+ * Deployed Contracts (Sepolia):
+ * - ThunderBatchAuction: 0x48f50f4166a9f10d13d0119590B71a724B5CE8AA
+ * - ThunderPrivacyHook:  0xBa4149aCEFddE4eDa3752e03D3785336565260C0
+ * - PrivacyRouter:       0xbcB1178BDc04fa7aBefb1bd43a750c432F8A299B
+ * - PoolManager:         0xE03A1074c86CFeDd5C142C4F04F1a1536e203543
  * Network: Sepolia (chainId: 11155111)
  */
 

@@ -528,6 +528,7 @@ contract ThunderPrivacyHook is BaseHook {
     }
 
     /// @notice Settles a batch after the reveal period
+    /// @dev Only operator can settle early; permissionless after 50% of settle period
     /// @param batchId The batch ID to settle
     function settleBatch(uint256 batchId) external whenNotPaused {
         if (batchId == 0 || batchId > currentBatchId) {
@@ -543,11 +544,30 @@ contract ThunderPrivacyHook is BaseHook {
             revert SettlePeriodNotStarted();
         }
 
+        // Griefing protection: operator can settle anytime during settle period
+        // Non-operators can only settle after 50% of settle period has passed
+        // This prevents early griefing while still allowing permissionless settlement
+        if (msg.sender != operator) {
+            uint256 settleStart = batch.revealDeadline;
+            uint256 settleMidpoint = settleStart + (SETTLE_PERIOD / 2);
+            require(
+                block.timestamp >= settleMidpoint,
+                "Only operator can settle early"
+            );
+        }
+
+        // Require minimum batch size for privacy guarantee
+        if (batch.revealedCount < MIN_BATCH_SIZE) {
+            revert InsufficientBatchSize();
+        }
+
         // Generate execution seed from block hash for fair ordering
+        // Use blockhash from a past block to prevent manipulation
         batch.executionSeed = keccak256(abi.encodePacked(
             blockhash(block.number - 1),
             batchId,
-            batch.revealedCount
+            batch.revealedCount,
+            block.timestamp
         ));
 
         batch.settled = true;
@@ -561,6 +581,46 @@ contract ThunderPrivacyHook is BaseHook {
         );
 
         // Create next batch automatically
+        _createNewBatch();
+    }
+
+    /// @notice Emergency settle with reduced batch size (operator only)
+    /// @dev Allows settlement with fewer participants if needed, with clear privacy warning
+    /// @param batchId The batch ID to settle
+    function emergencySettle(uint256 batchId) external onlyOperator whenNotPaused {
+        if (batchId == 0 || batchId > currentBatchId) {
+            revert InvalidBatchId();
+        }
+
+        Batch storage batch = batches[batchId];
+
+        if (batch.settled) {
+            revert BatchAlreadySettled();
+        }
+        if (block.timestamp < batch.revealDeadline) {
+            revert SettlePeriodNotStarted();
+        }
+
+        // Note: This bypasses MIN_BATCH_SIZE for emergencies
+        // Privacy guarantees may be reduced
+
+        batch.executionSeed = keccak256(abi.encodePacked(
+            blockhash(block.number - 1),
+            batchId,
+            batch.revealedCount,
+            block.timestamp
+        ));
+
+        batch.settled = true;
+
+        emit BatchSettled(
+            batchId,
+            batch.revealedCount,
+            batch.netAmount0,
+            batch.netAmount1,
+            batch.executionSeed
+        );
+
         _createNewBatch();
     }
 

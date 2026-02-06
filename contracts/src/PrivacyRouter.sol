@@ -5,8 +5,11 @@ import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {IPoolManager} from "v4-core/interfaces/IPoolManager.sol";
+import {IUnlockCallback} from "v4-core/interfaces/callback/IUnlockCallback.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
-import {Currency} from "v4-core/types/Currency.sol";
+import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
+import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
+import {SwapParams} from "v4-core/types/PoolOperation.sol";
 import {ThunderPrivacyHook} from "./ThunderPrivacyHook.sol";
 
 /// @title PrivacyRouter
@@ -25,8 +28,9 @@ import {ThunderPrivacyHook} from "./ThunderPrivacyHook.sol";
 /// - Commitment hash generation
 /// - Nullifier management
 /// - Interaction with the privacy hook
-contract PrivacyRouter is ReentrancyGuard {
+contract PrivacyRouter is ReentrancyGuard, IUnlockCallback {
     using SafeERC20 for IERC20;
+    using CurrencyLibrary for Currency;
 
     // ============ Events ============
 
@@ -62,6 +66,8 @@ contract PrivacyRouter is ReentrancyGuard {
     error SwapNotPrepared();
     error InsufficientBalance();
     error TransferFailed();
+    error InvalidCaller();
+    error SettlementFailed();
 
     // ============ Structs ============
 
@@ -82,6 +88,15 @@ contract PrivacyRouter is ReentrancyGuard {
         bool executed;
     }
 
+    /// @notice Callback data for pool manager unlock
+    struct SwapCallbackData {
+        address sender;
+        PoolKey poolKey;
+        bool zeroForOne;
+        int256 amountSpecified;
+        uint256 batchId;
+    }
+
     // ============ State Variables ============
 
     /// @notice The Uniswap v4 PoolManager
@@ -99,6 +114,12 @@ contract PrivacyRouter is ReentrancyGuard {
     /// @notice User's secret for nullifier generation (set once)
     mapping(address => bytes32) public userSecrets;
 
+    /// @notice The pool key for the privacy pool
+    PoolKey public poolKey;
+
+    /// @notice Flag indicating if pool key has been set
+    bool public poolKeySet;
+
     // ============ Constructor ============
 
     /// @param _poolManager The Uniswap v4 PoolManager address
@@ -112,6 +133,14 @@ contract PrivacyRouter is ReentrancyGuard {
     }
 
     // ============ Main Functions ============
+
+    /// @notice Set the pool key for privacy swaps
+    /// @param key The pool key to use for swaps
+    function setPoolKey(PoolKey calldata key) external {
+        require(!poolKeySet, "Pool key already set");
+        poolKey = key;
+        poolKeySet = true;
+    }
 
     /// @notice Set user's secret for nullifier generation (only once)
     /// @param secret The secret to use for nullifier generation
@@ -240,28 +269,122 @@ contract PrivacyRouter is ReentrancyGuard {
         emit PrivateSwapRevealed(msg.sender, swap.batchId);
     }
 
-    /// @notice Execute a revealed private swap
-    /// @dev In production, this would interact with PoolManager
+    /// @notice Execute a revealed private swap through poolManager.swap()
+    /// @dev Calls poolManager.unlock() which triggers unlockCallback to execute the swap
     function executePrivateSwap() external nonReentrant {
         PreparedSwap storage swap = preparedSwaps[msg.sender];
         if (swap.commitmentHash == bytes32(0)) revert SwapNotPrepared();
         require(swap.revealed, "Not revealed");
         require(!swap.executed, "Already executed");
+        require(poolKeySet, "Pool key not set");
 
-        // In production, this would:
-        // 1. Call poolManager.swap() with the prepared parameters
-        // 2. Pass the batchId in hookData for the privacy hook
-        // 3. Handle the balance deltas and transfer tokens
+        // Encode the callback data with batchId for the privacy hook
+        bytes memory callbackData = abi.encode(SwapCallbackData({
+            sender: msg.sender,
+            poolKey: poolKey,
+            zeroForOne: swap.zeroForOne,
+            amountSpecified: swap.amountSpecified,
+            batchId: swap.batchId
+        }));
 
-        // For now, mark as executed
+        // Mark as executed before external call (CEI pattern)
         swap.executed = true;
+
+        // Call poolManager.unlock() to execute the swap
+        // The unlockCallback will perform the actual swap and settle balances
+        bytes memory result = poolManager.unlock(callbackData);
+
+        // Decode the result to get the balance deltas
+        BalanceDelta delta = abi.decode(result, (BalanceDelta));
 
         emit PrivateSwapExecuted(
             msg.sender,
             swap.batchId,
-            swap.amountSpecified,
-            0 // Would be actual output amount
+            delta.amount0(),
+            delta.amount1()
         );
+    }
+
+    /// @notice Callback from PoolManager.unlock() to execute the swap
+    /// @param data Encoded SwapCallbackData
+    /// @return The encoded BalanceDelta from the swap
+    function unlockCallback(bytes calldata data) external override returns (bytes memory) {
+        if (msg.sender != address(poolManager)) revert InvalidCaller();
+
+        SwapCallbackData memory callbackData = abi.decode(data, (SwapCallbackData));
+
+        // Encode the batchId as hookData for the ThunderPrivacyHook
+        bytes memory hookData = abi.encode(callbackData.batchId);
+
+        // Execute the swap through the pool manager
+        // The hook's beforeSwap will validate the swap is authorized
+        // The hook's afterSwap will record the execution
+        BalanceDelta delta = poolManager.swap(
+            callbackData.poolKey,
+            SwapParams({
+                zeroForOne: callbackData.zeroForOne,
+                amountSpecified: callbackData.amountSpecified,
+                sqrtPriceLimitX96: callbackData.zeroForOne
+                    ? 4295128740  // MIN_SQRT_RATIO + 1
+                    : 1461446703485210103287273052203988822378723970341 // MAX_SQRT_RATIO - 1
+            }),
+            hookData
+        );
+
+        // Settle the balance deltas with the pool manager
+        _settleCurrencyDeltas(callbackData, delta);
+
+        return abi.encode(delta);
+    }
+
+    /// @notice Settle currency deltas after a swap
+    /// @param data The swap callback data
+    /// @param delta The balance delta from the swap
+    function _settleCurrencyDeltas(
+        SwapCallbackData memory data,
+        BalanceDelta delta
+    ) internal {
+        // Get the currencies from the pool key
+        Currency currency0 = data.poolKey.currency0;
+        Currency currency1 = data.poolKey.currency1;
+
+        // Handle amount0 (negative means we owe, positive means we receive)
+        int128 amount0 = delta.amount0();
+        if (amount0 < 0) {
+            // We owe currency0 to the pool - transfer from user's deposited tokens
+            _settle(currency0, uint128(-amount0));
+        } else if (amount0 > 0) {
+            // We receive currency0 from the pool - take and transfer to user
+            _take(currency0, data.sender, uint128(amount0));
+        }
+
+        // Handle amount1
+        int128 amount1 = delta.amount1();
+        if (amount1 < 0) {
+            // We owe currency1 to the pool
+            _settle(currency1, uint128(-amount1));
+        } else if (amount1 > 0) {
+            // We receive currency1 from the pool
+            _take(currency1, data.sender, uint128(amount1));
+        }
+    }
+
+    /// @notice Settle (pay) a currency to the pool manager
+    function _settle(Currency currency, uint128 amount) internal {
+        if (currency.isAddressZero()) {
+            // Native ETH
+            poolManager.settle{value: amount}();
+        } else {
+            // ERC20 token - sync first, then settle
+            poolManager.sync(currency);
+            IERC20(Currency.unwrap(currency)).safeTransfer(address(poolManager), amount);
+            poolManager.settle();
+        }
+    }
+
+    /// @notice Take (receive) a currency from the pool manager
+    function _take(Currency currency, address recipient, uint128 amount) internal {
+        poolManager.take(currency, recipient, amount);
     }
 
     /// @notice Cancel a prepared (but not committed) swap

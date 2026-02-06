@@ -4,3 +4,4 @@ export * from './Session';
 export * from './Trade';
 export * from './Settle';
 export * from './Payouts';
+export * from './PrivacyAuction';

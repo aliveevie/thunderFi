@@ -3,3 +3,4 @@ export * from './sessionStore';
 export * from './actionsStore';
 export * from './settlementStore';
 export * from './payoutStore';
+export * from './privacyAuctionStore';

@@ -6,7 +6,7 @@
 ## PART 1: THE PROBLEM (0:00 - 0:30)
 
 ### Scene 1: Problem Statement
-**[No visual / Dark screen with text overlay]**
+*[Dark screen with text overlay]*
 
 "DeFi trading is broken.
 
@@ -21,7 +21,7 @@ What if there was a better way?"
 ## PART 2: THE SOLUTION (0:30 - 1:00)
 
 ### Scene 2: Introducing thunderFi
-**[landing-page.png]**
+![Landing Page](landing-page.png)
 
 "Introducing thunderFi.
 
@@ -42,7 +42,7 @@ Let me show you how it works."
 ## PART 3: LIVE DEMO (1:00 - 2:30)
 
 ### Scene 3: Connect Wallet
-**[clickonconectandcreateand-approve.png]**
+![Connect Wallet](clickonconectandcreateand-approve.png)
 
 "Getting started takes seconds.
 
@@ -53,7 +53,7 @@ One click. You're in."
 ---
 
 ### Scene 4: Dashboard — Create Session
-**[click-create-sessiion.png]**
+![Create Session](click-create-sessiion.png)
 
 "This is your Dashboard. The system status shows three components: Session, Privacy Auction, and Payout.
 
@@ -62,7 +62,7 @@ Right now, no session exists. Click 'Create Session' to initialize your Yellow N
 ---
 
 ### Scene 5: Enter Deposit Amount
-**[type-amount&clikc-next.png]**
+![Enter Amount](type-amount&clikc-next.png)
 
 "Enter your USDC deposit amount.
 
@@ -73,7 +73,7 @@ No more paying $5, $10, $50 per transaction. One deposit. Unlimited actions."
 ---
 
 ### Scene 6: Request Testnet Tokens
-**[click-request-tokens.png]**
+![Request Tokens](click-request-tokens.png)
 
 "Need testnet USDC? One click gets you tokens from the faucet.
 
@@ -82,7 +82,7 @@ On mainnet, your existing USDC works seamlessly."
 ---
 
 ### Scene 7: Approve & Create
-**[session-creation.png]**
+![Session Creation](session-creation.png)
 
 "Review your session and confirm.
 
@@ -93,7 +93,7 @@ After this — every trade, every order, every action — happens off-chain. Ins
 ---
 
 ### Scene 8: Session Active
-**[session-created.png]**
+![Session Created](session-created.png)
 
 "Done.
 
@@ -104,7 +104,7 @@ That's it. You're ready to trade."
 ---
 
 ### Scene 9: Full Dashboard
-**[dashboard.png]**
+![Dashboard](dashboard.png)
 
 "Welcome to your trading command center.
 
@@ -126,7 +126,7 @@ All from one interface. One deposit. One experience."
 ## PART 4: CLOSING (2:30 - 3:00)
 
 ### Scene 10: Value Proposition
-**[landing-page.png]**
+![Landing Page](landing-page.png)
 
 "thunderFi eliminates the three biggest problems in DeFi:
 
@@ -146,7 +146,7 @@ thunderFi."
 
 ## END CARD
 
-**[Text overlay on landing-page.png]**
+![End Card](landing-page.png)
 
 ```
 thunderFi

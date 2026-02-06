@@ -108,19 +108,30 @@ export class PrivacyAuctionService {
       // Create contract instance (read-only)
       this.contract = new ethers.Contract(contractAddress, BATCH_AUCTION_ABI, this.provider);
 
-      // If we have a private key, create a signer for write operations
-      if (privateKey) {
-        this.signer = new ethers.Wallet(privateKey, this.provider);
-        this.contract = this.contract.connect(this.signer) as ethers.Contract;
-        logger.info(`[PrivacyAuction] Signer initialized: ${this.signer.address}`);
+      // Mark as initialized for read operations
+      this.initialized = true;
+      logger.info(`[PrivacyAuction] Initialized (read-only) - Contract: ${contractAddress}`);
+
+      // Try to set up signer for write operations (optional)
+      if (privateKey && privateKey !== 'your-operator-private-key') {
+        try {
+          this.signer = new ethers.Wallet(privateKey, this.provider);
+          this.contract = this.contract.connect(this.signer) as ethers.Contract;
+          logger.info(`[PrivacyAuction] Signer initialized: ${this.signer.address}`);
+        } catch (signerError) {
+          logger.warn(`[PrivacyAuction] Invalid OPERATOR_PRIVATE_KEY - write operations disabled: ${signerError}`);
+        }
+      } else {
+        logger.warn('[PrivacyAuction] No valid OPERATOR_PRIVATE_KEY - write operations (createAuction) disabled');
       }
 
-      this.initialized = true;
-      logger.info(`[PrivacyAuction] Initialized - Contract: ${contractAddress}`);
-
       // Log current auction ID
-      const currentId = await this.getCurrentAuctionId();
-      logger.info(`[PrivacyAuction] Current auction ID: ${currentId}`);
+      try {
+        const currentId = await this.getCurrentAuctionId();
+        logger.info(`[PrivacyAuction] Current auction ID: ${currentId}`);
+      } catch {
+        logger.info('[PrivacyAuction] No auctions created yet');
+      }
 
     } catch (error) {
       logger.error(`[PrivacyAuction] Failed to initialize: ${error}`);
@@ -221,9 +232,31 @@ export class PrivacyAuctionService {
     limitPrice: string,
     salt: string
   ): string {
+    // Convert string values to BigInt to ensure proper handling
+    // and validate they are non-negative uint256 values
+    let amountBigInt: bigint;
+    let limitPriceBigInt: bigint;
+
+    try {
+      amountBigInt = BigInt(amount);
+      limitPriceBigInt = BigInt(limitPrice);
+    } catch (e) {
+      throw new Error(`Invalid numeric values - amount: ${amount}, limitPrice: ${limitPrice}`);
+    }
+
+    // Ensure values are non-negative (uint256 constraint)
+    if (amountBigInt < 0n) {
+      throw new Error(`Amount cannot be negative: ${amount}`);
+    }
+    if (limitPriceBigInt < 0n) {
+      throw new Error(`Limit price cannot be negative: ${limitPrice}`);
+    }
+
+    logger.debug(`[PrivacyAuction] Generating commitment - trader: ${trader}, amount: ${amountBigInt}, limitPrice: ${limitPriceBigInt}`);
+
     return ethers.solidityPackedKeccak256(
       ['address', 'uint256', 'uint256', 'bytes32'],
-      [trader, amount, limitPrice, salt]
+      [trader, amountBigInt.toString(), limitPriceBigInt.toString(), salt]
     );
   }
 
@@ -242,8 +275,11 @@ export class PrivacyAuctionService {
     token1: string,
     collectionDurationSeconds: number
   ): Promise<{ auctionId: number; txHash: string } | null> {
-    if (!this.contract || !this.signer) {
-      throw new Error('Service not initialized or no signer');
+    if (!this.contract) {
+      throw new Error('Service not initialized');
+    }
+    if (!this.signer) {
+      throw new Error('No operator signer configured. Set OPERATOR_PRIVATE_KEY in .env with a wallet that has Sepolia ETH.');
     }
 
     try {

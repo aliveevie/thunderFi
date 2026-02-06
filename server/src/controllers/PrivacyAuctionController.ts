@@ -179,10 +179,57 @@ export class PrivacyAuctionController {
     try {
       const { trader, amount, limitPrice } = req.body;
 
+      logger.debug(`[PrivacyAuction] Commitment request - trader: ${trader}, amount: ${amount}, limitPrice: ${limitPrice}`);
+
       if (!trader || !amount || !limitPrice) {
         res.status(400).json({
           success: false,
           error: 'Missing required fields: trader, amount, limitPrice',
+        });
+        return;
+      }
+
+      // Validate trader address format
+      if (!/^0x[a-fA-F0-9]{40}$/.test(trader)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid trader address format',
+        });
+        return;
+      }
+
+      // Validate amount and limitPrice are valid positive numbers
+      try {
+        const amountBigInt = BigInt(amount);
+        const priceBigInt = BigInt(limitPrice);
+
+        if (amountBigInt < 0n) {
+          res.status(400).json({
+            success: false,
+            error: `Amount cannot be negative: ${amount}`,
+          });
+          return;
+        }
+
+        if (priceBigInt < 0n) {
+          res.status(400).json({
+            success: false,
+            error: `Limit price cannot be negative: ${limitPrice}`,
+          });
+          return;
+        }
+
+        if (amountBigInt === 0n) {
+          res.status(400).json({
+            success: false,
+            error: 'Amount must be greater than zero',
+          });
+          return;
+        }
+      } catch {
+        res.status(400).json({
+          success: false,
+          error: `Invalid numeric values - amount: ${amount}, limitPrice: ${limitPrice}`,
         });
         return;
       }
@@ -205,6 +252,7 @@ export class PrivacyAuctionController {
         data: { commitment, salt },
       });
     } catch (error) {
+      logger.error(`[PrivacyAuction] Commitment generation failed: ${error}`);
       next(error);
     }
   }

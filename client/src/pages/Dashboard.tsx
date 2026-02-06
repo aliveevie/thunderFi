@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, ArrowUpRight, ArrowDownRight, Activity, Wallet } from 'lucide-react';
+import { Zap, ArrowUpRight, ArrowDownRight, Activity, Wallet, Shield, Globe, CheckCircle2, Circle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@/components/ui';
 import { SessionStatus, CreateSessionModal } from '@/components/session';
 import { ActionCounter } from '@/components/trading';
 import { useSessionStore } from '@/stores/sessionStore';
 import { usePayoutStore } from '@/stores/payoutStore';
 import { useWalletStore } from '@/stores/walletStore';
+import { usePrivacyAuctionStore } from '@/stores/privacyAuctionStore';
 import { formatUSD, formatAmount } from '@/lib/utils';
 import { getAuthToken } from '@/services/api';
 
@@ -30,6 +31,14 @@ export function Dashboard() {
     (b) => b.token.symbol === 'USDC' || b.token.symbol === 'USDC.e'
   )?.amount || '0';
 
+  // Privacy auction status
+  const { currentAuctionId, fetchStatus } = usePrivacyAuctionStore();
+
+  // Fetch privacy status on mount
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -47,6 +56,73 @@ export function Dashboard() {
           </Button>
         )}
       </div>
+
+      {/* System Status */}
+      <Card className="border-dark-700">
+        <CardContent className="py-4">
+          <div className="grid grid-cols-3 gap-4">
+            {/* Session */}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-dark-800/50">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${session ? 'bg-thunder-500/20' : 'bg-dark-700'}`}>
+                <Zap className={`w-5 h-5 ${session ? 'text-thunder-500' : 'text-dark-500'}`} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-dark-200">Session</span>
+                  {session ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  ) : (
+                    <Circle className="w-3.5 h-3.5 text-dark-500" />
+                  )}
+                </div>
+                <span className="text-xs text-dark-500">
+                  {session ? 'Active' : 'Not Created'}
+                </span>
+              </div>
+            </div>
+
+            {/* Privacy Auction */}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-dark-800/50">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${currentAuctionId && currentAuctionId > 0 ? 'bg-thunder-500/20' : 'bg-dark-700'}`}>
+                <Shield className={`w-5 h-5 ${currentAuctionId && currentAuctionId > 0 ? 'text-thunder-500' : 'text-dark-500'}`} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-dark-200">Privacy Auction</span>
+                  {currentAuctionId && currentAuctionId > 0 ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  ) : (
+                    <Circle className="w-3.5 h-3.5 text-dark-500" />
+                  )}
+                </div>
+                <span className="text-xs text-dark-500">
+                  {currentAuctionId && currentAuctionId > 0 ? `Auction #${currentAuctionId}` : 'None'}
+                </span>
+              </div>
+            </div>
+
+            {/* Payout Wallets */}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-dark-800/50">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${wallets.length > 0 ? 'bg-thunder-500/20' : 'bg-dark-700'}`}>
+                <Globe className={`w-5 h-5 ${wallets.length > 0 ? 'text-thunder-500' : 'text-dark-500'}`} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-dark-200">Payout</span>
+                  {wallets.length > 0 ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                  ) : (
+                    <Circle className="w-3.5 h-3.5 text-dark-500" />
+                  )}
+                </div>
+                <span className="text-xs text-dark-500">
+                  {wallets.length > 0 ? `${wallets.length} Wallet(s)` : 'Not Connected'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

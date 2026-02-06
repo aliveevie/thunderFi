@@ -7,18 +7,18 @@ import { useWallet } from '@/hooks/useWallet';
 const features = [
   {
     icon: Gauge,
-    title: 'Instant Actions',
-    description: 'Execute unlimited off-chain actions with zero gas and zero confirmations.',
+    title: 'Instant Trading',
+    description: 'State channel sessions for gasless, instant off-chain trading. Create once, trade unlimited.',
   },
   {
     icon: Shield,
-    title: 'Privacy Enhanced',
-    description: 'Batch settlements hide individual timing and reduce on-chain footprint.',
+    title: 'Privacy Protected',
+    description: 'MEV-protected batch auctions using commit-reveal pattern. Fair pricing, hidden orders.',
   },
   {
     icon: Globe,
     title: 'Chain Abstracted',
-    description: 'Settle and pay out to any chain through Arc as your liquidity hub.',
+    description: 'Withdraw to any chain. Your USDC is bridged via CCTP to your destination.',
   },
 ];
 
@@ -180,7 +180,7 @@ export function Landing() {
       {/* Footer */}
       <footer className="relative z-10 border-t border-dark-800 px-6 py-8">
         <div className="max-w-7xl mx-auto text-center text-dark-500 text-sm">
-          Built for ETHGlobal Hackathon · Yellow SDK + Uniswap v4 + Arc
+          thunderFi — Gasless, privacy-preserving USDC trading
         </div>
       </footer>
     </div>

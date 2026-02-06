@@ -1,99 +1,171 @@
-# Session Creation Demo - Voice Over Script
+# thunderFi — Pitch Video Script
+**Runtime: ~3 minutes**
 
-## Scene 1: Landing Page
+---
+
+## PART 1: THE PROBLEM (0:00 - 0:30)
+
+### Scene 1: Problem Statement
+**[No visual / Dark screen with text overlay]**
+
+"DeFi trading is broken.
+
+Every swap costs gas. Every transaction leaks information to MEV bots. And moving assets between chains? That's a nightmare of bridges, fees, and failed transactions.
+
+Traders lose over $1.4 billion annually to MEV extraction alone. Gas fees eat into profits. And cross-chain liquidity remains fragmented.
+
+What if there was a better way?"
+
+---
+
+## PART 2: THE SOLUTION (0:30 - 1:00)
+
+### Scene 2: Introducing thunderFi
 **[landing-page.png]**
 
-"Welcome to thunderFi — a gasless, privacy-preserving USDC trading platform.
+"Introducing thunderFi.
 
-thunderFi combines three powerful technologies: Yellow Network state channels for instant off-chain trading, Uniswap v4 privacy hooks for MEV protection, and Circle's Arc for chain-abstracted payouts.
+One deposit. Unlimited gasless trades. Built-in MEV protection. Payouts to any chain.
 
-Let's walk through creating your first trading session."
+We've unified three breakthrough technologies into one seamless experience:
+
+**Yellow Network** — State channels that let you trade instantly, off-chain, with zero gas fees.
+
+**Uniswap v4 Privacy Hooks** — Commit-reveal batch auctions that eliminate frontrunning and sandwich attacks.
+
+**Circle Arc** — Your liquidity hub for instant cross-chain USDC transfers via CCTP.
+
+Let me show you how it works."
 
 ---
 
-## Scene 2: Connect Wallet
+## PART 3: LIVE DEMO (1:00 - 2:30)
+
+### Scene 3: Connect Wallet
 **[clickonconectandcreateand-approve.png]**
 
-"Click 'Get Started' or 'Connect Wallet' to begin.
+"Getting started takes seconds.
 
-This will open your wallet — we support MetaMask, WalletConnect, and other popular wallets.
+Click 'Get Started' and connect your wallet. We support MetaMask, WalletConnect, Coinbase Wallet, and more.
 
-Select your wallet and approve the connection request."
+One click. You're in."
 
 ---
 
-## Scene 3: Create Session
+### Scene 4: Dashboard — Create Session
 **[click-create-sessiion.png]**
 
-"Once connected, you'll see the Dashboard. Notice the system status showing your session is not yet created.
+"This is your Dashboard. The system status shows three components: Session, Privacy Auction, and Payout.
 
-Click 'Create Session' to initialize your Yellow Network state channel. This is a one-time setup that enables unlimited gasless trades."
+Right now, no session exists. Click 'Create Session' to initialize your Yellow Network state channel."
 
 ---
 
-## Scene 4: Enter Deposit Amount
+### Scene 5: Enter Deposit Amount
 **[type-amount&clikc-next.png]**
 
-"Enter the amount of USDC you want to deposit into your session.
+"Enter your USDC deposit amount.
 
-This deposit serves as your trading balance — you can execute unlimited off-chain actions against this balance without paying gas fees.
+This is your trading balance. Once deposited, you can execute unlimited trades against this balance — completely gasless.
 
-Enter your amount and click 'Next' to continue."
+No more paying $5, $10, $50 per transaction. One deposit. Unlimited actions."
 
 ---
 
-## Scene 5: Request Testnet Tokens
+### Scene 6: Request Testnet Tokens
 **[click-request-tokens.png]**
 
-"If you're on testnet and need USDC, click 'Request Tokens' to receive testnet USDC from the faucet.
+"Need testnet USDC? One click gets you tokens from the faucet.
 
-For mainnet, ensure you have sufficient USDC in your connected wallet."
+On mainnet, your existing USDC works seamlessly."
 
 ---
 
-## Scene 6: Approve & Confirm
+### Scene 7: Approve & Create
 **[session-creation.png]**
 
-"Review your session details and click 'Create Session'.
+"Review your session and confirm.
 
-Your wallet will prompt you to approve the USDC spend and confirm the transaction.
+Your wallet prompts for approval. This is the only on-chain transaction you'll make.
 
-This is the only on-chain transaction you'll need — after this, all your trades are gasless."
+After this — every trade, every order, every action — happens off-chain. Instant. Free."
 
 ---
 
-## Scene 7: Session Active
+### Scene 8: Session Active
 **[session-created.png]**
 
-"Your session is now active.
+"Done.
 
-The state channel is established with Yellow Network, and your USDC deposit is locked and ready for trading.
+Your state channel is live. Your balance is locked and ready. The Yellow Network connection is established.
 
-Notice your session balance is now displayed, and the status indicator shows 'Active'."
+That's it. You're ready to trade."
 
 ---
 
-## Scene 8: Dashboard Overview
+### Scene 9: Full Dashboard
 **[dashboard.png]**
 
-"You're now on the Dashboard with a fully active trading session.
+"Welcome to your trading command center.
 
-From here you can:
-- Execute instant, gasless trades
-- Use Privacy Mode for MEV-protected batch auctions
-- Settle your trades on-chain when ready
-- Payout to any chain via Circle's Arc
+**Session Balance** — Your available funds.
+**Total Actions** — Every gasless trade you've made.
+**Gas Saved** — Real dollars kept in your pocket.
+**Arc Hub Balance** — Your cross-chain liquidity pool.
 
-Your session tracks total actions, gas saved, and your Arc Hub balance for cross-chain withdrawals.
+From here, you can:
+- Trade instantly in Standard Mode
+- Enable Privacy Mode for MEV-protected batch auctions
+- Settle your positions on-chain whenever you're ready
+- Payout to Arbitrum, Base, Optimism, Polygon — any CCTP-supported chain
 
-Start trading — deposit once, trade unlimited."
+All from one interface. One deposit. One experience."
 
 ---
 
-## Closing
+## PART 4: CLOSING (2:30 - 3:00)
 
-"That's how easy it is to get started with thunderFi.
+### Scene 10: Value Proposition
+**[landing-page.png]**
 
-One deposit, unlimited gasless trades, privacy protection, and seamless cross-chain payouts.
+"thunderFi eliminates the three biggest problems in DeFi:
 
-Visit thunderfi.app to start trading today."
+**Gas fees?** Gone. Trade unlimited times on a single deposit.
+
+**MEV attacks?** Eliminated. Commit-reveal auctions ensure fair execution.
+
+**Chain fragmentation?** Solved. Arc routes your USDC anywhere instantly.
+
+This is the future of decentralized trading.
+
+Deposit once. Trade instantly. Pay out anywhere.
+
+thunderFi."
+
+---
+
+## END CARD
+
+**[Text overlay on landing-page.png]**
+
+```
+thunderFi
+Gasless. Private. Chain-Abstracted.
+
+GitHub: github.com/thunderfi
+Live Demo: thunderfi.app
+```
+
+---
+
+## TECHNICAL NOTES
+
+**Deployed Contracts (Sepolia):**
+- ThunderBatchAuction: `0x48f50f4166a9f10d13d0119590B71a724B5CE8AA`
+- ThunderPrivacyHook: `0xBa4149aCEFddE4eDa3752e03D3785336565260C0`
+- PrivacyRouter: `0xbcB1178BDc04fa7aBefb1bd43a750c432F8A299B`
+
+**Integrations:**
+- Yellow Network SDK — State channel sessions
+- Uniswap v4 — Privacy hooks for batch auctions
+- Circle Arc — CCTP cross-chain transfers

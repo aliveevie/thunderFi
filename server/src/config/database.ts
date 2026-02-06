@@ -1,30 +1,12 @@
-import { PrismaClient } from '@prisma/client';
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  });
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+/**
+ * Database stub — Prisma/PostgreSQL replaced with in-memory store.
+ * This file kept for compatibility; all data now lives in store.ts.
+ */
 
 export async function connectDatabase(): Promise<void> {
-  try {
-    await prisma.$connect();
-    console.log('✅ Database connected');
-  } catch (error) {
-    console.error('❌ Database connection failed:', error);
-    process.exit(1);
-  }
+  console.log('Using in-memory store (no database)');
 }
 
 export async function disconnectDatabase(): Promise<void> {
-  await prisma.$disconnect();
-  console.log('Database disconnected');
+  // no-op
 }

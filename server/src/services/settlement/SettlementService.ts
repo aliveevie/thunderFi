@@ -1,6 +1,5 @@
-import { prisma } from '../../config/database';
-import { BatchStatus, SessionStatus } from '@prisma/client';
-import { generateId, generateHex, hashData, sleep } from '../../utils/helpers';
+import { store, BatchStatus, SessionStatus } from '../../config/store';
+import { generateHex, hashData, sleep } from '../../utils/helpers';
 import { NotFoundError, ValidationError } from '../../middleware/errorHandler';
 import { BatchResponse, SettlementPreview } from '../../types';
 import { actionService } from '../session/ActionService';
@@ -11,9 +10,7 @@ export class SettlementService {
    * Preview settlement for a session
    */
   async previewSettlement(sessionId: string): Promise<SettlementPreview> {
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-    });
+    const session = store.findSessionById(sessionId);
 
     if (!session) {
       throw new NotFoundError('Session');
@@ -54,9 +51,7 @@ export class SettlementService {
    * Create and commit a settlement batch
    */
   async commitBatch(sessionId: string): Promise<BatchResponse> {
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-    });
+    const session = store.findSessionById(sessionId);
 
     if (!session) {
       throw new NotFoundError('Session');
@@ -73,34 +68,30 @@ export class SettlementService {
     }
 
     // Create batch
-    const batch = await prisma.settlementBatch.create({
-      data: {
-        sessionId,
-        actionCount: unsettledActions.length,
-        batchHash: hashData(unsettledActions.map(a => a.id)),
-        salt: generateHex(16),
-        status: BatchStatus.BUILDING,
-      },
+    const batch = store.createBatch({
+      sessionId,
+      actionCount: unsettledActions.length,
+      batchHash: hashData(unsettledActions.map(a => a.id)),
+      salt: generateHex(16),
+      status: BatchStatus.BUILDING,
+      netAmount: '0',
+      gasCost: null,
+      commitTxHash: null,
+      revealTxHash: null,
     });
 
     // Update session status
-    await prisma.session.update({
-      where: { id: sessionId },
-      data: { status: SessionStatus.SETTLING },
-    });
+    store.updateSession(sessionId, { status: SessionStatus.SETTLING });
 
     // Simulate commit transaction
     await sleep(2000);
     const commitTxHash = generateHex(32);
 
     // Update batch with commit tx
-    const updated = await prisma.settlementBatch.update({
-      where: { id: batch.id },
-      data: {
-        status: BatchStatus.COMMITTED,
-        commitTxHash,
-        committedAt: new Date(),
-      },
+    const updated = store.updateBatch(batch.id, {
+      status: BatchStatus.COMMITTED,
+      commitTxHash,
+      committedAt: new Date(),
     });
 
     logger.info(`Batch committed: ${batch.id}`);
@@ -112,9 +103,7 @@ export class SettlementService {
    * Reveal and execute settlement
    */
   async revealBatch(batchId: string): Promise<BatchResponse> {
-    const batch = await prisma.settlementBatch.findUnique({
-      where: { id: batchId },
-    });
+    const batch = store.findBatchById(batchId);
 
     if (!batch) {
       throw new NotFoundError('Batch');
@@ -142,23 +131,17 @@ export class SettlementService {
     );
 
     // Update batch
-    const updated = await prisma.settlementBatch.update({
-      where: { id: batchId },
-      data: {
-        status: BatchStatus.SETTLED,
-        revealTxHash,
-        revealedAt: new Date(),
-        settledAt: new Date(),
-        netAmount: parseFloat(netAmount) * 1e6, // Convert to smallest unit
-        gasCost: parseFloat(gasCost) * 1e6,
-      },
+    const updated = store.updateBatch(batchId, {
+      status: BatchStatus.SETTLED,
+      revealTxHash,
+      revealedAt: new Date(),
+      settledAt: new Date(),
+      netAmount: (parseFloat(netAmount) * 1e6).toString(),
+      gasCost: (parseFloat(gasCost) * 1e6).toString(),
     });
 
     // Restore session status to active
-    await prisma.session.update({
-      where: { id: batch.sessionId },
-      data: { status: SessionStatus.ACTIVE },
-    });
+    store.updateSession(batch.sessionId, { status: SessionStatus.ACTIVE });
 
     logger.info(`Batch settled: ${batchId} with ${batch.actionCount} actions`);
 
@@ -169,9 +152,7 @@ export class SettlementService {
    * Get batch by ID
    */
   async getBatch(batchId: string): Promise<BatchResponse> {
-    const batch = await prisma.settlementBatch.findUnique({
-      where: { id: batchId },
-    });
+    const batch = store.findBatchById(batchId);
 
     if (!batch) {
       throw new NotFoundError('Batch');
@@ -184,11 +165,7 @@ export class SettlementService {
    * Get batches for a session
    */
   async getSessionBatches(sessionId: string): Promise<BatchResponse[]> {
-    const batches = await prisma.settlementBatch.findMany({
-      where: { sessionId },
-      orderBy: { createdAt: 'desc' },
-    });
-
+    const batches = store.findBatchesBySession(sessionId);
     return batches.map(b => this.formatBatch(b));
   }
 
@@ -200,8 +177,8 @@ export class SettlementService {
     sessionId: string;
     actionCount: number;
     status: BatchStatus;
-    netAmount: { toString(): string };
-    gasCost: { toString(): string } | null;
+    netAmount: string;
+    gasCost: string | null;
     commitTxHash: string | null;
     revealTxHash: string | null;
     createdAt: Date;
@@ -211,8 +188,8 @@ export class SettlementService {
       sessionId: batch.sessionId,
       actionCount: batch.actionCount,
       status: batch.status,
-      netAmount: batch.netAmount.toString(),
-      gasCost: batch.gasCost?.toString() || null,
+      netAmount: batch.netAmount,
+      gasCost: batch.gasCost,
       commitTxHash: batch.commitTxHash,
       revealTxHash: batch.revealTxHash,
       createdAt: batch.createdAt,

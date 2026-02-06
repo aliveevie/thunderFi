@@ -7,7 +7,6 @@ import {
   Send,
   Settings,
   HelpCircle,
-  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,7 +14,6 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/session', icon: Zap, label: 'Session' },
   { to: '/trade', icon: ArrowLeftRight, label: 'Trade' },
-  { to: '/privacy', icon: Shield, label: 'Privacy Auction' },
   { to: '/settle', icon: CheckCircle2, label: 'Settle' },
   { to: '/payouts', icon: Send, label: 'Payouts' },
 ];

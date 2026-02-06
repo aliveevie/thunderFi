@@ -66,12 +66,14 @@ interface PrivacyAuctionState {
   // Loading states
   isLoading: boolean;
   isSubmitting: boolean;
+  isCreatingAuction: boolean;
   error: string | null;
 
   // Actions
   fetchStatus: () => Promise<void>;
   fetchAuction: (auctionId: number) => Promise<void>;
   generateCommitment: (trader: string, amount: string, limitPrice: string, isBid: boolean) => Promise<void>;
+  createAuction: (token0: string, token1: string, durationSeconds: number) => Promise<void>;
   clearPendingOrder: () => void;
   setError: (error: string | null) => void;
 }
@@ -87,6 +89,7 @@ export const usePrivacyAuctionStore = create<PrivacyAuctionState>((set, get) => 
   pendingOrder: null,
   isLoading: false,
   isSubmitting: false,
+  isCreatingAuction: false,
   error: null,
 
   fetchStatus: async () => {
@@ -162,6 +165,32 @@ export const usePrivacyAuctionStore = create<PrivacyAuctionState>((set, get) => 
 
   clearPendingOrder: () => {
     set({ pendingOrder: null });
+  },
+
+  createAuction: async (token0: string, token1: string, durationSeconds: number) => {
+    set({ isCreatingAuction: true, error: null });
+    try {
+      const response = await fetch(`${API_BASE}/auctions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token0,
+          token1,
+          collectionDurationSeconds: durationSeconds,
+        }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        set({ isCreatingAuction: false });
+        // Refresh status to get the new auction
+        get().fetchStatus();
+      } else {
+        set({ error: data.error || 'Failed to create auction', isCreatingAuction: false });
+      }
+    } catch (error) {
+      set({ error: 'Failed to create auction', isCreatingAuction: false });
+    }
   },
 
   setError: (error: string | null) => {

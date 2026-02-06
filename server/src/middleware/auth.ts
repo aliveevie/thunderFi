@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { AuthenticatedRequest } from '../types';
 import { env } from '../config/env';
 import { UnauthorizedError } from './errorHandler';
-import { prisma } from '../config/database';
+import { store } from '../config/store';
 
 interface JWTPayload {
   userId: string;
@@ -31,9 +31,7 @@ export async function authenticate(
       const decoded = jwt.verify(token, env.JWT_SECRET) as JWTPayload;
 
       // Verify user exists
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-      });
+      const user = store.findUserById(decoded.userId);
 
       if (!user) {
         throw new UnauthorizedError('User not found');
@@ -73,9 +71,7 @@ export async function optionalAuth(
     try {
       const decoded = jwt.verify(token, env.JWT_SECRET) as JWTPayload;
 
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-      });
+      const user = store.findUserById(decoded.userId);
 
       if (user) {
         req.user = {
@@ -100,6 +96,7 @@ export function generateToken(userId: string, walletAddress: string): string {
   return jwt.sign(
     { userId, walletAddress },
     env.JWT_SECRET,
-    { expiresIn: env.JWT_EXPIRES_IN }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { expiresIn: env.JWT_EXPIRES_IN } as any
   );
 }

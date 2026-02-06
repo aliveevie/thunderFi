@@ -1,5 +1,4 @@
-import { prisma } from '../../config/database';
-import { SessionStatus } from '@prisma/client';
+import { store, SessionStatus } from '../../config/store';
 import { generateId, generateHex, sleep } from '../../utils/helpers';
 import { NotFoundError, ValidationError } from '../../middleware/errorHandler';
 import { SessionResponse, CreateSessionInput } from '../../types';
@@ -19,18 +18,14 @@ export class SessionService {
     }
 
     // Create session
-    const session = await prisma.session.create({
-      data: {
-        userId,
-        initialAllowance: input.allowance,
-        spentAmount: '0',
-        status: SessionStatus.PENDING,
-      },
-      include: {
-        _count: {
-          select: { actions: true },
-        },
-      },
+    const session = store.createSession({
+      userId,
+      initialAllowance: input.allowance,
+      spentAmount: '0',
+      status: SessionStatus.PENDING,
+      yellowSessionId: null,
+      depositTxHash: null,
+      settlementTxHash: null,
     });
 
     // Simulate Yellow SDK session creation
@@ -38,30 +33,18 @@ export class SessionService {
     const yellowSessionId = `yellow_${generateId()}`;
 
     // Update with Yellow session ID
-    await prisma.session.update({
-      where: { id: session.id },
-      data: { yellowSessionId },
-    });
+    store.updateSession(session.id, { yellowSessionId });
 
     logger.info(`Session created: ${session.id}`);
 
-    return this.formatSession({
-      ...session,
-      yellowSessionId,
-      _count: session._count,
-    });
+    return this.formatSession({ ...session, yellowSessionId });
   }
 
   /**
    * Activate session after deposit
    */
   async activateSession(sessionId: string, depositTxHash: string): Promise<SessionResponse> {
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-      include: {
-        _count: { select: { actions: true } },
-      },
-    });
+    const session = store.findSessionById(sessionId);
 
     if (!session) {
       throw new NotFoundError('Session');
@@ -74,16 +57,10 @@ export class SessionService {
     // Simulate deposit verification
     await sleep(200);
 
-    const updated = await prisma.session.update({
-      where: { id: sessionId },
-      data: {
-        status: SessionStatus.ACTIVE,
-        depositTxHash,
-        activatedAt: new Date(),
-      },
-      include: {
-        _count: { select: { actions: true } },
-      },
+    const updated = store.updateSession(sessionId, {
+      status: SessionStatus.ACTIVE,
+      depositTxHash,
+      activatedAt: new Date(),
     });
 
     logger.info(`Session activated: ${sessionId}`);
@@ -95,12 +72,7 @@ export class SessionService {
    * Get session by ID
    */
   async getSession(sessionId: string): Promise<SessionResponse> {
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-      include: {
-        _count: { select: { actions: true } },
-      },
-    });
+    const session = store.findSessionById(sessionId);
 
     if (!session) {
       throw new NotFoundError('Session');
@@ -113,14 +85,7 @@ export class SessionService {
    * Get all sessions for a user
    */
   async getUserSessions(userId: string): Promise<SessionResponse[]> {
-    const sessions = await prisma.session.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: { select: { actions: true } },
-      },
-    });
-
+    const sessions = store.findSessionsByUser(userId);
     return sessions.map(s => this.formatSession(s));
   }
 
@@ -128,32 +93,22 @@ export class SessionService {
    * Update spent amount
    */
   async updateSpent(sessionId: string, amount: string): Promise<void> {
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-    });
+    const session = store.findSessionById(sessionId);
 
     if (!session) {
       throw new NotFoundError('Session');
     }
 
-    const newSpent = BigInt(session.spentAmount.toString()) + BigInt(amount);
+    const newSpent = BigInt(session.spentAmount) + BigInt(amount);
 
-    await prisma.session.update({
-      where: { id: sessionId },
-      data: { spentAmount: newSpent.toString() },
-    });
+    store.updateSession(sessionId, { spentAmount: newSpent.toString() });
   }
 
   /**
    * Close session
    */
   async closeSession(sessionId: string): Promise<SessionResponse> {
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-      include: {
-        _count: { select: { actions: true } },
-      },
-    });
+    const session = store.findSessionById(sessionId);
 
     if (!session) {
       throw new NotFoundError('Session');
@@ -167,16 +122,10 @@ export class SessionService {
     await sleep(500);
     const settlementTxHash = generateHex(32);
 
-    const updated = await prisma.session.update({
-      where: { id: sessionId },
-      data: {
-        status: SessionStatus.CLOSED,
-        settlementTxHash,
-        closedAt: new Date(),
-      },
-      include: {
-        _count: { select: { actions: true } },
-      },
+    const updated = store.updateSession(sessionId, {
+      status: SessionStatus.CLOSED,
+      settlementTxHash,
+      closedAt: new Date(),
     });
 
     logger.info(`Session closed: ${sessionId}`);
@@ -191,14 +140,13 @@ export class SessionService {
     id: string;
     yellowSessionId: string | null;
     status: SessionStatus;
-    initialAllowance: { toString(): string };
-    spentAmount: { toString(): string };
+    initialAllowance: string;
+    spentAmount: string;
     depositTxHash: string | null;
     createdAt: Date;
-    _count: { actions: number };
   }): SessionResponse {
-    const initial = BigInt(session.initialAllowance.toString());
-    const spent = BigInt(session.spentAmount.toString());
+    const initial = BigInt(session.initialAllowance);
+    const spent = BigInt(session.spentAmount);
     const remaining = initial - spent;
 
     return {
@@ -208,7 +156,7 @@ export class SessionService {
       initialAllowance: initial.toString(),
       spentAmount: spent.toString(),
       remainingAllowance: remaining.toString(),
-      actionsCount: session._count.actions,
+      actionsCount: store.countSessionActions(session.id),
       depositTxHash: session.depositTxHash,
       createdAt: session.createdAt,
     };

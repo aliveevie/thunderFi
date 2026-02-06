@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from '@/components/layout';
-import { Landing, Dashboard, Session, Trade, Settle, Payouts } from '@/pages';
+import { Landing, Dashboard, Session, Trade, Settle, Payouts, PrivacyAuction } from '@/pages';
 
 function App() {
   return (
@@ -16,6 +16,7 @@ function App() {
           <Route path="/trade" element={<Trade />} />
           <Route path="/settle" element={<Settle />} />
           <Route path="/payouts" element={<Payouts />} />
+          <Route path="/privacy" element={<PrivacyAuction />} />
 
           {/* Redirects */}
           <Route path="/settings" element={<Dashboard />} />

@@ -53,6 +53,9 @@ artifacts/
 # Circle recovery files (sensitive)
 recovery_file*.dat
 
+# Demo folder (local screenshots and scripts)
+Demo/
+
 # Misc
 *.local
 .turbo

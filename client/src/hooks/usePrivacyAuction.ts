@@ -395,8 +395,8 @@ export function useRevealOrder() {
  * Calculate the required deposit amount for an order
  *
  * For BID (buying USDC with WETH):
- *   deposit = (amount * limitPrice) / PRICE_PRECISION
- *   where amount is in USDC (6 decimals), limitPrice is in WETH per USDC (18 decimals)
+ *   deposit = amount * limitPrice (in WETH)
+ *   Example: Buy 100 USDC at 0.0005 WETH/USDC = 0.05 WETH deposit
  *
  * For ASK (selling USDC for WETH):
  *   deposit = amount (in USDC)
@@ -406,17 +406,16 @@ export function calculateRequiredDeposit(
   amountUsdc: string,  // Human readable USDC amount (e.g., "100")
   limitPriceWethPerUsdc: string // Human readable WETH price per USDC (e.g., "0.0005")
 ): { depositAmount: bigint; depositToken: string; depositDecimals: number } {
-  const PRICE_PRECISION = BigInt(1e18);
-
-  // Convert to smallest units
-  const amountWei = parseUnits(amountUsdc, TOKEN_DECIMALS.USDC); // USDC amount in 6 decimals
-  const limitPriceWei = parseUnits(limitPriceWethPerUsdc, 18); // Price in 18 decimals
-
   if (isBid) {
-    // BID: deposit WETH = (amount * limitPrice) / PRICE_PRECISION
-    // amount is in 6 decimals, limitPrice is in 18 decimals
-    // Result should be in 18 decimals (WETH)
-    const depositAmount = (amountWei * limitPriceWei) / PRICE_PRECISION;
+    // BID: deposit WETH = amount * price
+    // Calculate in human terms then convert to wei
+    const amountNum = parseFloat(amountUsdc) || 0;
+    const priceNum = parseFloat(limitPriceWethPerUsdc) || 0;
+    const depositWeth = amountNum * priceNum;
+
+    // Convert to wei (18 decimals) - use string to avoid floating point issues
+    const depositAmount = parseUnits(depositWeth.toFixed(18), 18);
+
     return {
       depositAmount,
       depositToken: SEPOLIA_TOKENS.WETH,
@@ -424,6 +423,7 @@ export function calculateRequiredDeposit(
     };
   } else {
     // ASK: deposit USDC = amount
+    const amountWei = parseUnits(amountUsdc, TOKEN_DECIMALS.USDC);
     return {
       depositAmount: amountWei,
       depositToken: SEPOLIA_TOKENS.USDC,

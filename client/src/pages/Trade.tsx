@@ -341,11 +341,6 @@ export function Trade() {
       return;
     }
 
-    if (depositInfo.hasInsufficientBalance) {
-      setError(`Insufficient ${depositInfo.tokenSymbol} balance`);
-      return;
-    }
-
     try {
       // Submit with ERC20 token deposit
       // For BID: deposit WETH
@@ -888,10 +883,10 @@ export function Trade() {
 
                               {/* Balance Warning */}
                               {depositInfo.hasInsufficientBalance && (
-                                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                                  <p className="text-red-400 text-sm">
-                                    Insufficient {depositInfo.tokenSymbol} balance.
-                                    You have {pendingOrder.isBid ? wethFormattedBalance : usdcFormattedBalance} but need {depositInfo.formattedDeposit}.
+                                <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                                  <p className="text-yellow-400 text-sm">
+                                    Low {depositInfo.tokenSymbol} balance ({pendingOrder.isBid ? wethFormattedBalance : usdcFormattedBalance}).
+                                    Need {depositInfo.formattedDeposit} for deposit.
                                   </p>
                                 </div>
                               )}
@@ -934,8 +929,7 @@ export function Trade() {
                                 disabled={
                                   isSubmittingOrder ||
                                   isConfirmingOrder ||
-                                  depositInfo.needsApproval ||
-                                  depositInfo.hasInsufficientBalance
+                                  depositInfo.needsApproval
                                 }
                               >
                                 <Shield className="w-4 h-4 mr-2" />

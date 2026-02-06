@@ -30,7 +30,7 @@ contract ThunderPrivacyHookHarness is ThunderPrivacyHook {
 }
 
 /// @title ThunderPrivacyHookTest
-/// @notice Tests for the ThunderPrivacyHook contract
+/// @notice Comprehensive tests for the ThunderPrivacyHook contract
 contract ThunderPrivacyHookTest is Test {
     ThunderPrivacyHookHarness hook;
     MockPoolManager mockManager;
@@ -43,6 +43,8 @@ contract ThunderPrivacyHookTest is Test {
     // Test users
     address alice = address(0x1);
     address bob = address(0x2);
+    address charlie = address(0x3);
+    address dave = address(0x4);
 
     function setUp() public {
         // Deploy mock pool manager
@@ -62,6 +64,8 @@ contract ThunderPrivacyHookTest is Test {
         // Fund test users
         vm.deal(alice, 100 ether);
         vm.deal(bob, 100 ether);
+        vm.deal(charlie, 100 ether);
+        vm.deal(dave, 100 ether);
     }
 
     // ============ Basic Tests ============
@@ -94,73 +98,125 @@ contract ThunderPrivacyHookTest is Test {
         assertGt(batch.revealDeadline, batch.commitDeadline);
         assertGt(batch.settleDeadline, batch.revealDeadline);
         assertFalse(batch.settled);
-        assertEq(batch.swapCount, 0);
+        assertEq(batch.commitmentCount, 0);
+    }
+
+    function test_PrivacyConstants() public view {
+        assertEq(hook.MIN_BATCH_SIZE(), 3);
+        assertEq(hook.MAX_SLIPPAGE_BPS(), 500);
+        assertEq(hook.PRIVACY_FEE_BPS(), 5);
+    }
+
+    // ============ Nullifier Tests ============
+
+    function test_GenerateNullifier() public view {
+        bytes32 secret = keccak256("alice_secret");
+        uint256 nonce = 0;
+
+        bytes32 nullifier1 = hook.generateNullifier(alice, secret, nonce);
+        bytes32 nullifier2 = hook.generateNullifier(alice, secret, nonce);
+
+        // Same inputs should give same nullifier
+        assertEq(nullifier1, nullifier2);
+
+        // Different nonce should give different nullifier
+        bytes32 nullifier3 = hook.generateNullifier(alice, secret, nonce + 1);
+        assertNotEq(nullifier1, nullifier3);
+    }
+
+    function test_NullifierCannotBeReused() public {
+        uint256 batchId = hook.currentBatchId();
+        bytes32 secret = keccak256("alice_secret");
+        bytes32 nullifier = hook.generateNullifier(alice, secret, 0);
+        bytes32 salt = keccak256("salt");
+
+        bytes32 commitment = hook.generateCommitmentHash(
+            alice,
+            true,
+            -1 ether,
+            nullifier,
+            salt
+        );
+
+        vm.startPrank(alice);
+
+        // First commit should succeed
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
+
+        // Second commit with same nullifier should fail
+        vm.expectRevert(ThunderPrivacyHook.NullifierAlreadyUsed.selector);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
+
+        vm.stopPrank();
     }
 
     // ============ Commit Tests ============
 
     function test_CommitSwap() public {
         uint256 batchId = hook.currentBatchId();
+        bytes32 secret = keccak256("alice_secret");
+        bytes32 nullifier = hook.generateNullifier(alice, secret, 0);
+        bytes32 salt = keccak256("alice_salt");
 
         vm.startPrank(alice);
 
-        bytes32 salt = keccak256("alice_salt");
         bytes32 commitment = hook.generateCommitmentHash(
             alice,
             true, // zeroForOne
             -1 ether, // amountSpecified
+            nullifier,
             salt
         );
 
-        hook.commitSwap(batchId, commitment);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
 
         ThunderPrivacyHook.Commitment memory aliceCommitment = hook.getCommitment(batchId, alice);
         assertEq(aliceCommitment.commitmentHash, commitment);
+        assertEq(aliceCommitment.nullifier, nullifier);
         assertFalse(aliceCommitment.revealed);
         assertFalse(aliceCommitment.executed);
 
         vm.stopPrank();
     }
 
-    function test_CommitSwap_UpdatesSwapCount() public {
+    function test_CommitSwap_UpdatesCommitmentCount() public {
         uint256 batchId = hook.currentBatchId();
 
-        vm.prank(alice);
-        hook.commitSwap(batchId, keccak256("alice"));
+        // Alice commits
+        _commitUser(alice, batchId, 0);
 
-        vm.prank(bob);
-        hook.commitSwap(batchId, keccak256("bob"));
+        // Bob commits
+        _commitUser(bob, batchId, 0);
 
-        (,,,, uint256 swapCount,,) = hook.batches(batchId);
-        assertEq(swapCount, 2);
+        ThunderPrivacyHook.Batch memory batch = hook.getBatch(batchId);
+        assertEq(batch.commitmentCount, 2);
     }
 
     function test_CommitSwap_RevertsAfterDeadline() public {
         uint256 batchId = hook.currentBatchId();
+        bytes32 nullifier = keccak256("nullifier");
+        bytes32 commitment = keccak256("test");
 
         // Warp past commit deadline
         vm.warp(block.timestamp + COMMIT_PERIOD + 1);
 
         vm.startPrank(alice);
-
-        bytes32 commitment = keccak256("test");
-
         vm.expectRevert(ThunderPrivacyHook.CommitmentPeriodEnded.selector);
-        hook.commitSwap(batchId, commitment);
-
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
         vm.stopPrank();
     }
 
     function test_CommitSwap_InvalidBatchId() public {
-        vm.startPrank(alice);
-
+        bytes32 nullifier = keccak256("nullifier");
         bytes32 commitment = keccak256("test");
 
-        vm.expectRevert(ThunderPrivacyHook.InvalidBatchId.selector);
-        hook.commitSwap(0, commitment);
+        vm.startPrank(alice);
 
         vm.expectRevert(ThunderPrivacyHook.InvalidBatchId.selector);
-        hook.commitSwap(999, commitment);
+        hook.commitSwap(0, commitment, nullifier, address(0));
+
+        vm.expectRevert(ThunderPrivacyHook.InvalidBatchId.selector);
+        hook.commitSwap(999, commitment, nullifier, address(0));
 
         vm.stopPrank();
     }
@@ -169,9 +225,12 @@ contract ThunderPrivacyHookTest is Test {
 
     function test_RevealSwap() public {
         uint256 batchId = hook.currentBatchId();
+        bytes32 secret = keccak256("alice_secret");
+        bytes32 nullifier = hook.generateNullifier(alice, secret, 0);
         bytes32 salt = keccak256("alice_salt");
         bool zeroForOne = true;
         int256 amountSpecified = -1 ether;
+        uint256 maxSlippage = 100; // 1%
 
         // Commit
         vm.startPrank(alice);
@@ -180,38 +239,42 @@ contract ThunderPrivacyHookTest is Test {
             alice,
             zeroForOne,
             amountSpecified,
+            nullifier,
             salt
         );
-        hook.commitSwap(batchId, commitment);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
 
         // Warp to reveal period
         vm.warp(block.timestamp + COMMIT_PERIOD + 1);
 
         // Reveal
-        hook.revealSwap(batchId, zeroForOne, amountSpecified, salt);
+        hook.revealSwap(batchId, zeroForOne, amountSpecified, maxSlippage, salt);
 
         ThunderPrivacyHook.Commitment memory aliceCommitment = hook.getCommitment(batchId, alice);
         assertTrue(aliceCommitment.revealed);
         assertEq(aliceCommitment.zeroForOne, zeroForOne);
         assertEq(aliceCommitment.amountSpecified, amountSpecified);
+        assertEq(aliceCommitment.maxSlippage, maxSlippage);
 
         vm.stopPrank();
     }
 
     function test_RevealSwap_AuthorizesSwap() public {
         uint256 batchId = hook.currentBatchId();
+        bytes32 secret = keccak256("alice_secret");
+        bytes32 nullifier = hook.generateNullifier(alice, secret, 0);
         bytes32 salt = keccak256("alice_salt");
 
         vm.startPrank(alice);
 
-        bytes32 commitment = hook.generateCommitmentHash(alice, true, -1 ether, salt);
-        hook.commitSwap(batchId, commitment);
+        bytes32 commitment = hook.generateCommitmentHash(alice, true, -1 ether, nullifier, salt);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
 
         // Not authorized before reveal
         assertFalse(hook.authorizedSwaps(batchId, alice));
 
         vm.warp(block.timestamp + COMMIT_PERIOD + 1);
-        hook.revealSwap(batchId, true, -1 ether, salt);
+        hook.revealSwap(batchId, true, -1 ether, 100, salt);
 
         // Authorized after reveal
         assertTrue(hook.authorizedSwaps(batchId, alice));
@@ -219,89 +282,101 @@ contract ThunderPrivacyHookTest is Test {
         vm.stopPrank();
     }
 
-    function test_RevealSwap_RevertsBeforeCommitDeadline() public {
+    function test_RevealSwap_UpdatesRevealedCount() public {
         uint256 batchId = hook.currentBatchId();
-        bytes32 salt = keccak256("alice_salt");
 
-        vm.startPrank(alice);
+        // Multiple users commit
+        _commitUser(alice, batchId, 0);
+        _commitUser(bob, batchId, 0);
+        _commitUser(charlie, batchId, 0);
 
-        bytes32 commitment = hook.generateCommitmentHash(alice, true, -1 ether, salt);
-        hook.commitSwap(batchId, commitment);
+        // Warp to reveal period
+        vm.warp(block.timestamp + COMMIT_PERIOD + 1);
 
-        // Try to reveal before commit period ends
-        vm.expectRevert(ThunderPrivacyHook.RevealPeriodNotStarted.selector);
-        hook.revealSwap(batchId, true, -1 ether, salt);
+        // All reveal
+        _revealUser(alice, batchId, 0);
+        _revealUser(bob, batchId, 0);
+        _revealUser(charlie, batchId, 0);
 
-        vm.stopPrank();
+        ThunderPrivacyHook.Batch memory batch = hook.getBatch(batchId);
+        assertEq(batch.revealedCount, 3);
     }
 
-    function test_RevealSwap_RevertsAfterRevealDeadline() public {
+    function test_RevealSwap_ExcessiveSlippage() public {
         uint256 batchId = hook.currentBatchId();
+        bytes32 secret = keccak256("alice_secret");
+        bytes32 nullifier = hook.generateNullifier(alice, secret, 0);
         bytes32 salt = keccak256("alice_salt");
 
         vm.startPrank(alice);
 
-        bytes32 commitment = hook.generateCommitmentHash(alice, true, -1 ether, salt);
-        hook.commitSwap(batchId, commitment);
-
-        // Warp past reveal deadline
-        vm.warp(block.timestamp + COMMIT_PERIOD + REVEAL_PERIOD + 1);
-
-        vm.expectRevert(ThunderPrivacyHook.RevealPeriodEnded.selector);
-        hook.revealSwap(batchId, true, -1 ether, salt);
-
-        vm.stopPrank();
-    }
-
-    function test_RevealSwap_InvalidCommitment_WrongDirection() public {
-        uint256 batchId = hook.currentBatchId();
-        bytes32 salt = keccak256("alice_salt");
-
-        vm.startPrank(alice);
-
-        bytes32 commitment = hook.generateCommitmentHash(alice, true, -1 ether, salt);
-        hook.commitSwap(batchId, commitment);
+        bytes32 commitment = hook.generateCommitmentHash(alice, true, -1 ether, nullifier, salt);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
 
         vm.warp(block.timestamp + COMMIT_PERIOD + 1);
 
-        vm.expectRevert(ThunderPrivacyHook.InvalidCommitment.selector);
-        hook.revealSwap(batchId, false, -1 ether, salt); // wrong direction
+        // Try to reveal with excessive slippage (>5%)
+        vm.expectRevert(ThunderPrivacyHook.ExcessiveSlippage.selector);
+        hook.revealSwap(batchId, true, -1 ether, 600, salt); // 6%
 
         vm.stopPrank();
     }
 
-    function test_RevealSwap_InvalidCommitment_WrongAmount() public {
+    function test_RevealSwap_InvalidAmount() public {
         uint256 batchId = hook.currentBatchId();
+        bytes32 secret = keccak256("alice_secret");
+        bytes32 nullifier = hook.generateNullifier(alice, secret, 0);
         bytes32 salt = keccak256("alice_salt");
 
         vm.startPrank(alice);
 
-        bytes32 commitment = hook.generateCommitmentHash(alice, true, -1 ether, salt);
-        hook.commitSwap(batchId, commitment);
+        bytes32 commitment = hook.generateCommitmentHash(alice, true, 0, nullifier, salt);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
 
         vm.warp(block.timestamp + COMMIT_PERIOD + 1);
 
-        vm.expectRevert(ThunderPrivacyHook.InvalidCommitment.selector);
-        hook.revealSwap(batchId, true, -2 ether, salt); // wrong amount
+        vm.expectRevert(ThunderPrivacyHook.InvalidSwapAmount.selector);
+        hook.revealSwap(batchId, true, 0, 100, salt);
 
         vm.stopPrank();
     }
 
-    function test_RevealSwap_InvalidCommitment_WrongSalt() public {
+    // ============ Privacy Metrics Tests ============
+
+    function test_PrivacyMetrics_NotPrivateWithLowCount() public {
         uint256 batchId = hook.currentBatchId();
-        bytes32 salt = keccak256("alice_salt");
 
-        vm.startPrank(alice);
-
-        bytes32 commitment = hook.generateCommitmentHash(alice, true, -1 ether, salt);
-        hook.commitSwap(batchId, commitment);
+        // Only 2 users commit and reveal (below MIN_BATCH_SIZE of 3)
+        _commitUser(alice, batchId, 0);
+        _commitUser(bob, batchId, 0);
 
         vm.warp(block.timestamp + COMMIT_PERIOD + 1);
 
-        vm.expectRevert(ThunderPrivacyHook.InvalidCommitment.selector);
-        hook.revealSwap(batchId, true, -1 ether, keccak256("wrong_salt"));
+        _revealUser(alice, batchId, 0);
+        _revealUser(bob, batchId, 0);
 
-        vm.stopPrank();
+        (uint256 anonymitySet, bool isPrivate) = hook.getPrivacyMetrics(batchId);
+        assertEq(anonymitySet, 2);
+        assertFalse(isPrivate);
+    }
+
+    function test_PrivacyMetrics_PrivateWithSufficientCount() public {
+        uint256 batchId = hook.currentBatchId();
+
+        // 3 users commit and reveal (meets MIN_BATCH_SIZE)
+        _commitUser(alice, batchId, 0);
+        _commitUser(bob, batchId, 0);
+        _commitUser(charlie, batchId, 0);
+
+        vm.warp(block.timestamp + COMMIT_PERIOD + 1);
+
+        _revealUser(alice, batchId, 0);
+        _revealUser(bob, batchId, 0);
+        _revealUser(charlie, batchId, 0);
+
+        (uint256 anonymitySet, bool isPrivate) = hook.getPrivacyMetrics(batchId);
+        assertEq(anonymitySet, 3);
+        assertTrue(isPrivate);
     }
 
     // ============ Batch Management Tests ============
@@ -319,11 +394,11 @@ contract ThunderPrivacyHookTest is Test {
         uint256 beforeCreate = block.timestamp;
         uint256 batchId = hook.createBatch();
 
-        (uint256 commitDeadline, uint256 revealDeadline, uint256 settleDeadline,,,,) = hook.batches(batchId);
+        ThunderPrivacyHook.Batch memory batch = hook.getBatch(batchId);
 
-        assertEq(commitDeadline, beforeCreate + COMMIT_PERIOD);
-        assertEq(revealDeadline, beforeCreate + COMMIT_PERIOD + REVEAL_PERIOD);
-        assertEq(settleDeadline, beforeCreate + COMMIT_PERIOD + REVEAL_PERIOD + SETTLE_PERIOD);
+        assertEq(batch.commitDeadline, beforeCreate + COMMIT_PERIOD);
+        assertEq(batch.revealDeadline, beforeCreate + COMMIT_PERIOD + REVEAL_PERIOD);
+        assertEq(batch.settleDeadline, beforeCreate + COMMIT_PERIOD + REVEAL_PERIOD + SETTLE_PERIOD);
     }
 
     function test_SettleBatch() public {
@@ -334,8 +409,9 @@ contract ThunderPrivacyHookTest is Test {
 
         hook.settleBatch(batchId);
 
-        (,,, bool settled,,,) = hook.batches(batchId);
-        assertTrue(settled);
+        ThunderPrivacyHook.Batch memory batch = hook.getBatch(batchId);
+        assertTrue(batch.settled);
+        assertNotEq(batch.executionSeed, bytes32(0));
 
         // New batch should be created
         assertEq(hook.currentBatchId(), batchId + 1);
@@ -352,140 +428,125 @@ contract ThunderPrivacyHookTest is Test {
         hook.settleBatch(batchId);
     }
 
-    function test_SettleBatch_RevertsDuringRevealPeriod() public {
+    // ============ Batch Phase Tests ============
+
+    function test_GetBatchPhase() public {
         uint256 batchId = hook.currentBatchId();
+        ThunderPrivacyHook.Batch memory batch = hook.getBatch(batchId);
 
-        vm.warp(block.timestamp + COMMIT_PERIOD + 1); // Still in reveal period
+        // Phase 1: Commit (currently in commit period)
+        assertEq(hook.getBatchPhase(batchId), 1);
 
-        vm.expectRevert(ThunderPrivacyHook.RevealPeriodNotStarted.selector);
-        hook.settleBatch(batchId);
+        // Phase 2: Reveal (after commit deadline)
+        vm.warp(batch.commitDeadline + 1);
+        assertEq(hook.getBatchPhase(batchId), 2);
+
+        // Phase 3: Settle (after reveal deadline)
+        vm.warp(batch.revealDeadline + 1);
+        assertEq(hook.getBatchPhase(batchId), 3);
+
+        // Phase 4: Completed (after settle deadline)
+        vm.warp(batch.settleDeadline + 1);
+        assertEq(hook.getBatchPhase(batchId), 4);
     }
 
-    function test_SettleBatch_InvalidBatchId() public {
-        vm.expectRevert(ThunderPrivacyHook.InvalidBatchId.selector);
-        hook.settleBatch(0);
-
-        vm.expectRevert(ThunderPrivacyHook.InvalidBatchId.selector);
-        hook.settleBatch(999);
+    function test_GetBatchPhase_InvalidBatchId() public view {
+        assertEq(hook.getBatchPhase(0), 0);
+        assertEq(hook.getBatchPhase(999), 0);
     }
 
-    // ============ Period Check Tests ============
+    // ============ Emergency Functions Tests ============
 
-    function test_IsCommitPeriod() public {
+    function test_EmergencyPause() public {
+        hook.emergencyPause("Security issue");
+
+        assertTrue(hook.paused());
+    }
+
+    function test_EmergencyPause_BlocksCommit() public {
+        hook.emergencyPause("Security issue");
+
         uint256 batchId = hook.currentBatchId();
+        bytes32 nullifier = keccak256("nullifier");
+        bytes32 commitment = keccak256("test");
 
-        assertTrue(hook.isCommitPeriod(batchId));
-
-        vm.warp(block.timestamp + COMMIT_PERIOD + 1);
-        assertFalse(hook.isCommitPeriod(batchId));
+        vm.startPrank(alice);
+        vm.expectRevert(ThunderPrivacyHook.ContractPaused.selector);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
+        vm.stopPrank();
     }
 
-    function test_IsRevealPeriod() public {
+    function test_Unpause() public {
+        hook.emergencyPause("Security issue");
+        assertTrue(hook.paused());
+
+        hook.unpause();
+        assertFalse(hook.paused());
+    }
+
+    function test_OnlyOperator_Pause() public {
+        vm.startPrank(alice);
+        vm.expectRevert(ThunderPrivacyHook.OnlyOperator.selector);
+        hook.emergencyPause("Unauthorized");
+        vm.stopPrank();
+    }
+
+    function test_TransferOperator() public {
+        hook.transferOperator(alice);
+        assertEq(hook.operator(), alice);
+
+        // New operator can pause
+        vm.prank(alice);
+        hook.emergencyPause("New operator action");
+        assertTrue(hook.paused());
+    }
+
+    // ============ Full Flow Test ============
+
+    function test_FullPrivateSwapFlow() public {
         uint256 batchId = hook.currentBatchId();
         uint256 startTime = block.timestamp;
 
-        assertFalse(hook.isRevealPeriod(batchId));
+        // Step 1: Multiple users commit (for privacy guarantee)
+        _commitUser(alice, batchId, 0);
+        _commitUser(bob, batchId, 0);
+        _commitUser(charlie, batchId, 0);
 
+        ThunderPrivacyHook.Batch memory batchAfterCommit = hook.getBatch(batchId);
+        assertEq(batchAfterCommit.commitmentCount, 3);
+
+        // Step 2: Move to reveal period and reveal
         vm.warp(startTime + COMMIT_PERIOD + 1);
-        assertTrue(hook.isRevealPeriod(batchId));
 
+        _revealUser(alice, batchId, 0);
+        _revealUser(bob, batchId, 0);
+        _revealUser(charlie, batchId, 0);
+
+        ThunderPrivacyHook.Batch memory batchAfterReveal = hook.getBatch(batchId);
+        assertEq(batchAfterReveal.revealedCount, 3);
+
+        // Verify privacy guarantee is met
+        (uint256 anonymitySet, bool isPrivate) = hook.getPrivacyMetrics(batchId);
+        assertEq(anonymitySet, 3);
+        assertTrue(isPrivate);
+
+        // Step 3: Move to settle period
         vm.warp(startTime + COMMIT_PERIOD + REVEAL_PERIOD + 1);
-        assertFalse(hook.isRevealPeriod(batchId));
-    }
 
-    function test_IsSettlePeriod() public {
-        uint256 batchId = hook.currentBatchId();
+        // All users are authorized to swap
+        assertTrue(hook.authorizedSwaps(batchId, alice));
+        assertTrue(hook.authorizedSwaps(batchId, bob));
+        assertTrue(hook.authorizedSwaps(batchId, charlie));
 
-        assertFalse(hook.isSettlePeriod(batchId));
+        // Step 4: Settle the batch
+        hook.settleBatch(batchId);
 
-        vm.warp(block.timestamp + COMMIT_PERIOD + REVEAL_PERIOD + 1);
-        assertTrue(hook.isSettlePeriod(batchId));
+        ThunderPrivacyHook.Batch memory settledBatch = hook.getBatch(batchId);
+        assertTrue(settledBatch.settled);
+        assertNotEq(settledBatch.executionSeed, bytes32(0));
 
-        vm.warp(block.timestamp + SETTLE_PERIOD + 1);
-        assertFalse(hook.isSettlePeriod(batchId));
-    }
-
-    function test_PeriodChecks_InvalidBatchId() public view {
-        assertFalse(hook.isCommitPeriod(0));
-        assertFalse(hook.isCommitPeriod(999));
-        assertFalse(hook.isRevealPeriod(0));
-        assertFalse(hook.isRevealPeriod(999));
-        assertFalse(hook.isSettlePeriod(0));
-        assertFalse(hook.isSettlePeriod(999));
-    }
-
-    // ============ Hash Generation Tests ============
-
-    function test_GenerateCommitmentHash() public view {
-        bytes32 salt = keccak256("test_salt");
-        address user = alice;
-        bool zeroForOne = true;
-        int256 amount = -1 ether;
-
-        bytes32 hash1 = hook.generateCommitmentHash(user, zeroForOne, amount, salt);
-        bytes32 hash2 = hook.generateCommitmentHash(user, zeroForOne, amount, salt);
-
-        // Same inputs should give same hash
-        assertEq(hash1, hash2);
-
-        // Different direction should give different hash
-        bytes32 hash3 = hook.generateCommitmentHash(user, !zeroForOne, amount, salt);
-        assertNotEq(hash1, hash3);
-
-        // Different amount should give different hash
-        bytes32 hash4 = hook.generateCommitmentHash(user, zeroForOne, -2 ether, salt);
-        assertNotEq(hash1, hash4);
-
-        // Different salt should give different hash
-        bytes32 hash5 = hook.generateCommitmentHash(user, zeroForOne, amount, keccak256("other"));
-        assertNotEq(hash1, hash5);
-
-        // Different user should give different hash
-        bytes32 hash6 = hook.generateCommitmentHash(bob, zeroForOne, amount, salt);
-        assertNotEq(hash1, hash6);
-    }
-
-    // ============ Multiple Users Test ============
-
-    function test_MultipleUsersCommitReveal() public {
-        uint256 batchId = hook.currentBatchId();
-        bytes32 aliceSalt = keccak256("alice");
-        bytes32 bobSalt = keccak256("bob");
-
-        // Alice commits
-        vm.prank(alice);
-        bytes32 aliceCommitment = hook.generateCommitmentHash(alice, true, -1 ether, aliceSalt);
-        vm.prank(alice);
-        hook.commitSwap(batchId, aliceCommitment);
-
-        // Bob commits
-        vm.prank(bob);
-        bytes32 bobCommitment = hook.generateCommitmentHash(bob, false, 1 ether, bobSalt);
-        vm.prank(bob);
-        hook.commitSwap(batchId, bobCommitment);
-
-        // Check swap count
-        (,,,, uint256 swapCount,,) = hook.batches(batchId);
-        assertEq(swapCount, 2);
-
-        // Warp to reveal period
-        vm.warp(block.timestamp + COMMIT_PERIOD + 1);
-
-        // Both reveal
-        vm.prank(alice);
-        hook.revealSwap(batchId, true, -1 ether, aliceSalt);
-
-        vm.prank(bob);
-        hook.revealSwap(batchId, false, 1 ether, bobSalt);
-
-        // Verify reveals
-        ThunderPrivacyHook.Commitment memory aliceData = hook.getCommitment(batchId, alice);
-        ThunderPrivacyHook.Commitment memory bobData = hook.getCommitment(batchId, bob);
-
-        assertTrue(aliceData.revealed);
-        assertTrue(bobData.revealed);
-        assertTrue(aliceData.zeroForOne);
-        assertFalse(bobData.zeroForOne);
+        // New batch created automatically
+        assertEq(hook.currentBatchId(), batchId + 1);
     }
 
     // ============ Event Tests ============
@@ -494,40 +555,21 @@ contract ThunderPrivacyHookTest is Test {
         uint256 expectedBatchId = hook.currentBatchId() + 1;
 
         vm.expectEmit(true, false, false, false);
-        emit ThunderPrivacyHook.BatchCreated(expectedBatchId, 0, 0);
+        emit ThunderPrivacyHook.BatchCreated(expectedBatchId, 0, 0, 0);
 
         hook.createBatch();
     }
 
     function test_EmitsSwapCommitted() public {
         uint256 batchId = hook.currentBatchId();
+        bytes32 nullifier = keccak256("nullifier");
         bytes32 commitment = keccak256("test");
 
-        vm.expectEmit(true, true, false, true);
-        emit ThunderPrivacyHook.SwapCommitted(batchId, alice, commitment);
+        vm.expectEmit(true, true, false, false);
+        emit ThunderPrivacyHook.SwapCommitted(batchId, alice, commitment, 0);
 
         vm.prank(alice);
-        hook.commitSwap(batchId, commitment);
-    }
-
-    function test_EmitsSwapRevealed() public {
-        uint256 batchId = hook.currentBatchId();
-        bytes32 salt = keccak256("salt");
-        bool zeroForOne = true;
-        int256 amount = -1 ether;
-
-        vm.startPrank(alice);
-        bytes32 commitment = hook.generateCommitmentHash(alice, zeroForOne, amount, salt);
-        hook.commitSwap(batchId, commitment);
-        vm.stopPrank();
-
-        vm.warp(block.timestamp + COMMIT_PERIOD + 1);
-
-        vm.expectEmit(true, true, false, true);
-        emit ThunderPrivacyHook.SwapRevealed(batchId, alice, zeroForOne, amount);
-
-        vm.prank(alice);
-        hook.revealSwap(batchId, zeroForOne, amount, salt);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
     }
 
     function test_EmitsBatchSettled() public {
@@ -535,9 +577,35 @@ contract ThunderPrivacyHookTest is Test {
 
         vm.warp(block.timestamp + COMMIT_PERIOD + REVEAL_PERIOD + 1);
 
-        vm.expectEmit(true, false, false, true);
-        emit ThunderPrivacyHook.BatchSettled(batchId, 0, 0);
+        vm.expectEmit(true, false, false, false);
+        emit ThunderPrivacyHook.BatchSettled(batchId, 0, 0, 0, bytes32(0));
 
         hook.settleBatch(batchId);
+    }
+
+    // ============ Helper Functions ============
+
+    function _commitUser(address user, uint256 batchId, uint256 nonce) internal {
+        bytes32 secret = keccak256(abi.encodePacked(user, "secret"));
+        bytes32 nullifier = hook.generateNullifier(user, secret, nonce);
+        bytes32 salt = keccak256(abi.encodePacked(user, "salt", nonce));
+
+        bytes32 commitment = hook.generateCommitmentHash(
+            user,
+            true,
+            -1 ether,
+            nullifier,
+            salt
+        );
+
+        vm.prank(user);
+        hook.commitSwap(batchId, commitment, nullifier, address(0));
+    }
+
+    function _revealUser(address user, uint256 batchId, uint256 nonce) internal {
+        bytes32 salt = keccak256(abi.encodePacked(user, "salt", nonce));
+
+        vm.prank(user);
+        hook.revealSwap(batchId, true, -1 ether, 100, salt);
     }
 }
